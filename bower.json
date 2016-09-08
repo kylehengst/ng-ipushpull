@@ -1,0 +1,21 @@
+{
+  "name": "ng-ipushpull-page",
+  "version": "0.1.0",
+  "authors": [
+    "Tomas Dostal, iPushPull"
+  ],
+  "description": "Provider for getting page content",
+  "main": "ng-ipushpull-page.js",
+  "keywords": [],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components"
+  ],
+  "dependencies": {
+    "angular": ">= 1.2.0",
+    "socket.io-client": "^1.4.6",
+    "eventEmitter": "^5.1.0"
+  }
+}

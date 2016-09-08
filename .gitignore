@@ -1,0 +1,38 @@
+#################
+#  IDE Specific #
+#################
+.idea
+
+################
+# Node Modules #
+################
+node_modules
+npm-debug.log
+
+.tmp
+
+####################
+# Bower Components #
+####################
+bower_components
+
+##########
+# Config #
+##########
+config/config_diff.js
+config/config_diff.ts.ts
+
+##############
+# Typescript #
+##############
+*.ts.js
+*.js.map
+typings
+
+########
+# Dist #
+########
+dist
+
+# Test app
+test_app

@@ -1,0 +1,9 @@
+{
+  "name": "ippPagesApp",
+  "dependencies": {},
+  "globalDependencies": {
+    "angular": "registry:dt/angular#1.5.0+20160602160139",
+    "socket.io-client": "registry:dt/socket.io-client#1.4.4+20160317120654",
+    "wolfy87-eventemitter": "registry:dt/wolfy87-eventemitter#4.2.9+20160524142429"
+  }
+}
