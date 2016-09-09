@@ -1,11 +1,11 @@
 {
   "name": "ng-ipushpull-page",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "authors": [
     "Tomas Dostal, iPushPull"
   ],
   "description": "Provider for getting page content",
-  "main": "build/ng-ipushpull.min.js",
+  "main": "build/ng-ipushpull.js",
   "keywords": [],
   "license": "MIT",
   "ignore": [
