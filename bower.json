@@ -5,13 +5,14 @@
     "Tomas Dostal, iPushPull"
   ],
   "description": "Provider for getting page content",
-  "main": "ng-ipushpull-page.js",
+  "main": "build/ng-ipushpull.min.js",
   "keywords": [],
   "license": "MIT",
   "ignore": [
     "**/.*",
     "node_modules",
-    "bower_components"
+    "bower_components",
+    "src"
   ],
   "dependencies": {
     "angular": ">= 1.2.0",
