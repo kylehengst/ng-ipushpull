@@ -8,11 +8,6 @@
   "main": "build/ng-ipushpull.js",
   "keywords": [],
   "license": "MIT",
-  "ignore": [
-    "node_modules",
-    "bower_components",
-    "src"
-  ],
   "dependencies": {
     "angular": ">= 1.2.0",
     "socket.io-client": "^1.4.6",
