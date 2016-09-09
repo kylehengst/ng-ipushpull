@@ -4,12 +4,12 @@ namespace ipushpull {
     import Socket = SocketIOClient.Socket;
 
     // Main/public page service
-    let $q, $timeout, api, auth, config;
+    let $q, $timeout, api, auth, crypto, config;
 
     class PageWrap {
-        public static $inject: string[] = ["$q", "$timeout", "ippApi", "ippAuth", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "$timeout", "ippApi", "ippAuth", "ippCrypto", "ipushpull_conf"];
 
-        constructor(q, timeout, ippApi, ippAuth, ippConf){
+        constructor(q, timeout, ippApi, ippAuth, ippCrypto, ippConf){
             let defaults: any = {
                 api_url: "https://www.ipushpull.dev",
             };
@@ -18,6 +18,7 @@ namespace ipushpull {
             $timeout = timeout;
             api = ippApi;
             auth = ippAuth;
+            crypto = ippCrypto;
             config = angular.merge({}, defaults, ippConf);
 
             return Page;
@@ -42,6 +43,8 @@ namespace ipushpull {
         private _folderId: number;
         private _pageName: string;
         private _folderName: string;
+
+        private _passphrase: string = "";
 
         constructor(pageId?: string | number, folderId?: string | number, autoStart: boolean = true){
             super();
@@ -77,6 +80,8 @@ namespace ipushpull {
                 this.init(autoStart);
             }
         }
+
+        public set passphrase(passphrase: string){ this._passphrase = passphrase; }
 
         public start(): void{
             this._provider.start();
@@ -122,6 +127,20 @@ namespace ipushpull {
         private registerListeners(){
             // Setup listeners
             this._provider.on("content_update", (data) => {
+                // Check for encryption and decrypt
+                if (data.encryption_type_used) {
+                    let decrypted: any = crypto.decryptContent({
+                        name: data.encryption_key_used,
+                        passphrase: this._passphrase,
+                    }, data.encrypted_content);
+
+                    if (decrypted){
+                        data.content = decrypted;
+                    } else {
+                        this.emit("error", "Decryption failed");
+                    }
+                }
+
                 this.emit("new_content", data);
             });
 
@@ -133,6 +152,33 @@ namespace ipushpull {
                 this.emit("error", err);
             });
         }
+
+        /*private encrypt(key?: any): boolean {
+            if (!key) {
+                key = ippKeyring.getKey(this.folderName, this.data.encryption_key_to_use);
+            }
+
+            if (!key) {
+                let passphrase = prompt("This page should be encrypted with key " + this.data.encryption_key_to_use + ". Please input the passphrase");
+
+                if (!passphrase) return false;
+
+                key = {
+                    name: this.data.encryption_key_to_use,
+                    passphrase: passphrase
+                };
+
+                ippKeyring.saveKey(this.folderName, key, false);
+            }
+
+            this.data.encrypted_content = ippCrypto.encryptContent(key, this.data.content); // @todo: Handle encryption error
+            this.data.content = [];
+
+            this.data.encryption_type_used = 1;
+            this.data.encryption_key_used = key.name;
+
+            return true;
+        }*/
     }
 
     // @todo extend event emitter interface
@@ -198,27 +244,19 @@ namespace ipushpull {
                     // New update
                     if (res.httpCode === 200){
                         this._seqNo = res.data.seq_no;
-                        this.emit("content_update", res.data.content);
-                        this.emit("meta_update"); // @todo Handle this
+                        this.emit("content_update", this.tempGetContentOb(res.data));
+                        this.emit("meta_update", this.tempGetSettingsOb(res.data));
                     } else {
                         // @todo do we need this?
                         this.emit("empty_update");
                     }
 
-                    q.resolve(page);
+                    q.resolve(res.data);
                 } else {
                     this.emit("error", res.data);
                     q.reject({});
                 }
             }, (err) => {
-                // @todo do this better...
-                if (err.httpCode === 401){
-                    auth.refreshTokens().catch(() => {
-                        // @todo emit something
-                        this.stop();
-                    });
-                }
-
                 this.emit("error", err.httpText);
                 q.reject(err);
             }).finally(() => {
@@ -226,6 +264,41 @@ namespace ipushpull {
             });
 
             return q.promise;
+        }
+
+        /**
+         * Temporary solution to get the required subset of data from full page object
+         *
+         * @param data
+         * @returns {{id: number, seq_no: number, content_modified_timestamp: Date, content: any, content_modified_by: any, push_interval: number, pull_interval: number, is_public: boolean, description: string, encrypted_content: string, encryption_key_used: number, encryption_type_used: number, special_page_type: number}}
+         */
+        private tempGetContentOb(data): any {
+            return {
+                id: data.id,
+                domain_id: data.domain_id,
+                seq_no: data.seq_no,
+                content_modified_timestamp: data.content_modified_timestamp,
+                content: data.content,
+                content_modified_by: data.content_modified_by,
+                push_interval: data.push_interval,
+                pull_interval: data.pull_interval,
+                is_public: data.is_public,
+                description: data.description,
+                encrypted_content: data.encrypted_content,
+                encryption_key_used: data.encryption_key_used,
+                encryption_type_used: data.encryption_type_used,
+                special_page_type: data.special_page_type,
+            };
+        }
+
+        /**
+         * Temporary solution to get the required subset of data from full page object
+         *
+         * @param data
+         * @returns {any}
+         */
+        private tempGetSettingsOb(data): any {
+            return JSON.parse(JSON.stringify(data));
         }
     }
 
@@ -301,7 +374,7 @@ namespace ipushpull {
 
         private onPageContent = (data): void => {
             $timeout(() => {
-                this.emit("content_update", data.content);
+                this.emit("content_update", data);
             });
         };
 
