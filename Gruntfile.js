@@ -32,13 +32,13 @@ module.exports = function(grunt){
             ipushpull: {
                 src: "build/ng-ipushpull.js",
                 dest: "build/ng-ipushpull.min.js",
-                commitFiles: ["-a"],
             }
         },
 
         bump: {
             options: {
                 files: ['package.json', 'bower.json'],
+                commitFiles: ["-a"],
                 push: false
             }
         }
