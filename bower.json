@@ -9,7 +9,7 @@
   "keywords": [],
   "license": "MIT",
   "ignore": [
-    "**/.*",
+    "./.*",
     "node_modules",
     "bower_components",
     "src"
