@@ -4,7 +4,7 @@ module.exports = function(grunt){
     grunt.loadNpmTasks('grunt-contrib-concat');
     grunt.loadNpmTasks('grunt-bump');
 
-    grunt.registerTask('build', ['clean', 'concat:ipushpull', 'uglify:ipushpull']);
+    grunt.registerTask('build', ['clean', 'concat:ipushpull', 'concat:definition', 'uglify:ipushpull']);
     grunt.registerTask('release', ['build', 'bump']);
 
     grunt.initConfig({
@@ -24,6 +24,12 @@ module.exports = function(grunt){
                     'bower_components/socket.io-client/socket.io.js',
                     'src/ipushpull.ts.js',
                     'src/**/*.ts.js',
+                ]
+            },
+            definition: {
+                dest: 'build/index.d.ts',
+                src: [
+                    'src/**/*.d.ts'
                 ]
             }
         },

@@ -1,4 +1,12 @@
 declare namespace ipushpull {
+}
+
+declare namespace ipushpull {
+    import IModule = angular.IModule;
+    const module: IModule;
+}
+
+declare namespace ipushpull {
     interface IPageContentLink {
         external: boolean;
         address: string;

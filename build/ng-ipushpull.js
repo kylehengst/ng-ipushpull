@@ -7772,7 +7772,7 @@ var ipushpull;
     var PageWrap = (function () {
         function PageWrap(q, timeout, ippApi, ippAuth, ippCrypto, ippConf) {
             var defaults = {
-                url: "https://www.ipushpull.dev",
+                url: "https://www.ipushpull.com",
             };
             $q = q;
             $timeout = timeout;
@@ -7792,6 +7792,8 @@ var ipushpull;
             var _this = this;
             if (autoStart === void 0) { autoStart = true; }
             _super.call(this);
+            this.ready = false;
+            this.decrypted = true;
             this._supportsWS = true;
             this._passphrase = "";
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
@@ -7814,6 +7816,11 @@ var ipushpull;
                 this.init(autoStart);
             }
         }
+        Object.defineProperty(Page.prototype, "data", {
+            get: function () { return this._data; },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Page.prototype, "passphrase", {
             set: function (passphrase) { this._passphrase = passphrase; },
             enumerable: true,
@@ -7851,21 +7858,29 @@ var ipushpull;
         Page.prototype.registerListeners = function () {
             var _this = this;
             this._provider.on("content_update", function (data) {
+                _this.ready = true;
                 if (data.encryption_type_used) {
                     var decrypted = crypto.decryptContent({
                         name: data.encryption_key_used,
                         passphrase: _this._passphrase,
                     }, data.encrypted_content);
                     if (decrypted) {
+                        _this.decrypted = true;
                         data.content = decrypted;
                     }
                     else {
+                        _this.decrypted = false;
                         _this.emit("error", "Decryption failed");
                     }
                 }
+                else {
+                    _this.decrypted = true;
+                }
+                _this._data = angular.merge({}, _this._data, data);
                 _this.emit("new_content", data);
             });
             this._provider.on("meta_update", function (data) {
+                _this._data = angular.merge({}, _this._data, data);
                 _this.emit("new_meta", data);
             });
             this._provider.on("error", function (err) {
