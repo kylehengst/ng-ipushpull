@@ -166,7 +166,7 @@ namespace ipushpull {
         private _endPoint: string;
 
         constructor(private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private $q: IQService, private auth, private config){
-            this._endPoint = `${this.config.api_url}/api/1.0/`;
+            this._endPoint = `${this.config.url}/api/1.0/`;
 
             return;
         }

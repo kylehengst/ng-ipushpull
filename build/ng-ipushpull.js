@@ -7387,7 +7387,7 @@ var ipushpull;
                 });
                 return q.promise;
             };
-            this._endPoint = this.config.api_url + "/api/1.0/";
+            this._endPoint = this.config.url + "/api/1.0/";
             return;
         }
         Api.prototype.getSelfInfo = function () {
@@ -7648,7 +7648,7 @@ var ipushpull;
                     username: username,
                     password: password,
                 }),
-                url: this.config.api_url + "/api/1.0/oauth/token/",
+                url: this.config.url + "/api/1.0/oauth/token/",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
@@ -7679,7 +7679,7 @@ var ipushpull;
                     client_secret: this.config.api_secret,
                     refresh_token: this._refreshToken,
                 }),
-                url: this.config.api_url + "/api/1.0/oauth/token/",
+                url: this.config.url + "/api/1.0/oauth/token/",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
@@ -7772,7 +7772,7 @@ var ipushpull;
     var PageWrap = (function () {
         function PageWrap(q, timeout, ippApi, ippAuth, ippCrypto, ippConf) {
             var defaults = {
-                api_url: "https://www.ipushpull.dev",
+                url: "https://www.ipushpull.dev",
             };
             $q = q;
             $timeout = timeout;
@@ -8060,7 +8060,7 @@ var ipushpull;
             query = query.filter(function (val) {
                 return (val.length > 0);
             });
-            return io.connect(config.api_url + "/page/" + this._pageId, {
+            return io.connect(config.url + "/page/" + this._pageId, {
                 query: query.join("&"),
                 forceNew: true,
             });

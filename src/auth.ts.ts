@@ -28,7 +28,7 @@ namespace ipushpull {
                     username: username,
                     password: password,
                 }),
-                url: `${this.config.api_url}/api/1.0/oauth/token/`,
+                url: `${this.config.url}/api/1.0/oauth/token/`,
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
@@ -64,7 +64,7 @@ namespace ipushpull {
                     client_secret: this.config.api_secret,
                     refresh_token: this._refreshToken,
                 }),
-                url: `${this.config.api_url}/api/1.0/oauth/token/`,
+                url: `${this.config.url}/api/1.0/oauth/token/`,
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },

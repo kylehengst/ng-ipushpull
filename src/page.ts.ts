@@ -11,7 +11,7 @@ namespace ipushpull {
 
         constructor(q, timeout, ippApi, ippAuth, ippCrypto, ippConf){
             let defaults: any = {
-                api_url: "https://www.ipushpull.dev",
+                url: "https://www.ipushpull.dev",
             };
 
             $q = q;
@@ -34,6 +34,13 @@ namespace ipushpull {
         push: () => void;
         destroy: () => void;
     }
+
+    /**
+     * Outstanding work
+     * ------------------------------
+     * @todo Implement page access polling
+     */
+
 
     class Page extends EventEmitter implements IIPushPullPageService {
         private _supportsWS: boolean = true; // let's be optimistic by default
@@ -362,7 +369,7 @@ namespace ipushpull {
                 return (val.length > 0);
             });
 
-            return io.connect(`${config.api_url}/page/${this._pageId}`, {
+            return io.connect(`${config.url}/page/${this._pageId}`, {
                 query: query.join("&"),
                 forceNew: true,
             });
