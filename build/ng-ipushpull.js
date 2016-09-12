@@ -7816,6 +7816,61 @@ var ipushpull;
                 this.init(autoStart);
             }
         }
+        Object.defineProperty(Page, "TYPE_REGULAR", {
+            get: function () { return 0; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "TYPE_ALERT", {
+            get: function () { return 5; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "TYPE_PDF", {
+            get: function () { return 6; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "TYPE_PAGE_ACCESS_REPORT", {
+            get: function () { return 1001; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "TYPE_DOMAIN_USAGE_REPORT", {
+            get: function () { return 1002; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "TYPE_GLOBAL_USAGE_REPORT", {
+            get: function () { return 1003; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "TYPE_PAGE_UPDATE_REPORT", {
+            get: function () { return 1004; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "TYPE_LIVE_USAGE_REPORT", {
+            get: function () { return 1007; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "EVENT_NEW_CONTENT", {
+            get: function () { return "new_content"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "EVENT_NEW_META", {
+            get: function () { return "new_meta"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page, "EVENT_ERROR", {
+            get: function () { return "error"; },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Page.prototype, "data", {
             get: function () { return this._data; },
             enumerable: true,
@@ -7859,6 +7914,7 @@ var ipushpull;
             var _this = this;
             this._provider.on("content_update", function (data) {
                 _this.ready = true;
+                data.special_page_type = _this.updatePageType(data.special_page_type);
                 if (data.encryption_type_used) {
                     var decrypted = crypto.decryptContent({
                         name: data.encryption_key_used,
@@ -7870,22 +7926,29 @@ var ipushpull;
                     }
                     else {
                         _this.decrypted = false;
-                        _this.emit("error", "Decryption failed");
+                        _this.emit(Page.EVENT_ERROR, "Decryption failed");
                     }
                 }
                 else {
                     _this.decrypted = true;
                 }
                 _this._data = angular.merge({}, _this._data, data);
-                _this.emit("new_content", data);
+                _this.emit(Page.EVENT_NEW_CONTENT, data);
             });
             this._provider.on("meta_update", function (data) {
+                data.special_page_type = _this.updatePageType(data.special_page_type);
                 _this._data = angular.merge({}, _this._data, data);
-                _this.emit("new_meta", data);
+                _this.emit(Page.EVENT_NEW_META, data);
             });
             this._provider.on("error", function (err) {
-                _this.emit("error", err);
+                _this.emit(Page.EVENT_ERROR, err);
             });
+        };
+        Page.prototype.updatePageType = function (pageType) {
+            if (pageType > 0 && pageType < 5 || pageType === 7) {
+                pageType += 1000;
+            }
+            return pageType;
         };
         return Page;
     }(EventEmitter));

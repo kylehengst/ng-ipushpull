@@ -2,6 +2,17 @@ declare namespace ipushpull {
 }
 
 declare namespace ipushpull {
+    interface IEncryptionKey {
+        name: string;
+        passphrase: string;
+    }
+    interface ICryptoService {
+        decryptContent: (key: any, data: string) => IPageContent;
+        encryptContent: (key: IEncryptionKey, data: IPageContent) => string;
+    }
+}
+
+declare namespace ipushpull {
     import IModule = angular.IModule;
     const module: IModule;
 }
@@ -94,6 +105,8 @@ declare namespace ipushpull {
         show_gridlines: boolean;
         special_page_type: number;
     }
+    interface IPage extends IPageServiceMeta {
+    }
     interface IPageRangeRights {
         ro: number[];
         no: number[];
@@ -105,7 +118,7 @@ declare namespace ipushpull {
         rights: IPageRangeRights;
         freeze: boolean;
     }
-    interface IIPushPullPageService {
+    interface IPageService {
         ready: boolean;
         decrypted: boolean;
         passphrase: string;
