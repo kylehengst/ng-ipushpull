@@ -105,6 +105,10 @@ namespace ipushpull {
         special_page_type: number;
     }
 
+    export interface IPage extends IPageServiceMeta {
+
+    }
+
     export interface IPageRangeRights {
         ro: number[];
         no: number[];
@@ -145,7 +149,7 @@ namespace ipushpull {
     ipushpull.module.service("ippPage", PageWrap);
 
     // @todo extend event emitter interface
-    export interface IIPushPullPageService {
+    export interface IPageService {
         ready: boolean;
         decrypted: boolean;
 
@@ -158,7 +162,20 @@ namespace ipushpull {
         destroy: () => void;
     }
 
-    class Page extends EventEmitter implements IIPushPullPageService {
+    class Page extends EventEmitter implements IPageService {
+        public static get TYPE_REGULAR(): number { return 0; }
+        public static get TYPE_ALERT(): number { return 5; }
+        public static get TYPE_PDF(): number { return 6; }
+        public static get TYPE_PAGE_ACCESS_REPORT(): number { return 1001; }
+        public static get TYPE_DOMAIN_USAGE_REPORT(): number { return 1002; }
+        public static get TYPE_GLOBAL_USAGE_REPORT(): number { return 1003; }
+        public static get TYPE_PAGE_UPDATE_REPORT(): number { return 1004; }
+        public static get TYPE_LIVE_USAGE_REPORT(): number { return 1007; }
+
+        public static get EVENT_NEW_CONTENT(): string { return "new_content"; }
+        public static get EVENT_NEW_META(): string { return "new_meta"; }
+        public static get EVENT_ERROR(): string { return "error"; }
+
         public ready: boolean = false;
         public decrypted: boolean = true;
 
@@ -258,6 +275,8 @@ namespace ipushpull {
                 // @todo should change only on initial load, so might move it somewhere else
                 this.ready = true;
 
+                data.special_page_type = this.updatePageType(data.special_page_type);
+
                 // Check for encryption and decrypt
                 if (data.encryption_type_used) {
                     let decrypted: any = crypto.decryptContent({
@@ -270,7 +289,7 @@ namespace ipushpull {
                         data.content = decrypted;
                     } else {
                         this.decrypted = false;
-                        this.emit("error", "Decryption failed");
+                        this.emit(Page.EVENT_ERROR, "Decryption failed");
                     }
                 } else {
                     this.decrypted = true;
@@ -278,18 +297,29 @@ namespace ipushpull {
 
                 this._data = angular.merge({}, this._data, data);
 
-                this.emit("new_content", data);
+                // @todo This should be emitted before decryption probably
+                this.emit(Page.EVENT_NEW_CONTENT, data);
             });
 
             this._provider.on("meta_update", (data) => {
+                data.special_page_type = this.updatePageType(data.special_page_type);
+
                 this._data = angular.merge({}, this._data, data);
 
-                this.emit("new_meta", data);
+                this.emit(Page.EVENT_NEW_META, data);
             });
 
             this._provider.on("error", (err) => {
-                this.emit("error", err);
+                this.emit(Page.EVENT_ERROR, err);
             });
+        }
+
+        private updatePageType(pageType: number): number{
+            if (pageType > 0 && pageType < 5 || pageType === 7){
+                pageType += 1000;
+            }
+
+            return pageType;
         }
 
         /*private encrypt(key?: any): boolean {

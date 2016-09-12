@@ -86,6 +86,8 @@ declare namespace ipushpull {
         show_gridlines: boolean;
         special_page_type: number;
     }
+    interface IPage extends IPageServiceMeta {
+    }
     interface IPageRangeRights {
         ro: number[];
         no: number[];
@@ -97,7 +99,7 @@ declare namespace ipushpull {
         rights: IPageRangeRights;
         freeze: boolean;
     }
-    interface IIPushPullPageService {
+    interface IPageService {
         ready: boolean;
         decrypted: boolean;
         passphrase: string;
