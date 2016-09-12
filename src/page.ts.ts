@@ -226,7 +226,7 @@ namespace ipushpull {
             }
         }
 
-        public get data(){ return this._data; }
+        public get data(): IPage{ return this._data; }
         public set passphrase(passphrase: string){ this._passphrase = passphrase; }
 
         public start(): void{
@@ -307,6 +307,10 @@ namespace ipushpull {
 
             this._provider.on("meta_update", (data) => {
                 data.special_page_type = this.updatePageType(data.special_page_type);
+                
+                // Remove content fields (should not be here and in the future will not be here)
+                delete data.content;
+                delete data.encrypted_content;
 
                 this._data = angular.merge({}, this._data, data);
 
@@ -712,20 +716,20 @@ namespace ipushpull {
 
                 this.currentStyle[styleName] = prefix + style[item] + suffix;
             }
-
-            /*var inlineStyle = '';
-            for (item in currentStyle) {
-                inlineStyle += item + ': ' + currentStyle[item] + ';';
-            }
+            
+            let resultStyles: IPageCellStyle = angular.copy(this.currentStyle);
 
             // Process currentBorders
-            for (var borderPos in currentBorders) {
-                if (typeof currentBorders[borderPos].style === 'undefined' || !currentBorders[borderPos].style) continue;
+            for (let borderPos in this.currentBorders) {
+                if (typeof this.currentBorders[borderPos].style === "undefined" || !this.currentBorders[borderPos].style){
+                    continue;
+                }
 
-                inlineStyle += 'border-' + borderPos + ': ' + currentBorders[borderPos].width + ' ' + currentBorders[borderPos].style + ' ' + currentBorders[borderPos].color + ';';
-            }*/
+                resultStyles["border-" + borderPos] = `${this.currentBorders[borderPos].width} ${this.currentBorders[borderPos].style} ${this.currentBorders[borderPos].color};`;
+            }
 
-            return angular.copy(this.currentStyle);
+
+            return resultStyles;
         }
 
         public reset(): void{
