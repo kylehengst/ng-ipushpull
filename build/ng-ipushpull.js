@@ -7932,6 +7932,7 @@ var ipushpull;
                 else {
                     _this.decrypted = true;
                 }
+                data.content = PageStyles.decompressStyles(data.content);
                 _this._data = angular.merge({}, _this._data, data);
                 _this.emit(Page.EVENT_NEW_CONTENT, data);
             });
@@ -8145,4 +8146,128 @@ var ipushpull;
         };
         return ProviderSocket;
     }(EventEmitter));
+    var PageStyles = (function () {
+        function PageStyles() {
+            this.currentStyle = {};
+            this.currentBorders = { top: {}, right: {}, bottom: {}, left: {} };
+            this.excelStyles = {
+                "text-wrap": "white-space",
+                "tbs": "border-top-style",
+                "rbs": "border-right-style",
+                "bbs": "border-bottom-style",
+                "lbs": "border-left-style",
+                "tbc": "border-top-color",
+                "rbc": "border-right-color",
+                "bbc": "border-bottom-color",
+                "lbc": "border-left-color",
+                "tbw": "border-top-width",
+                "rbw": "border-right-width",
+                "bbw": "border-bottom-width",
+                "lbw": "border-left-width",
+            };
+            this.excelBorderStyles = {
+                "solid": "solid",
+                "thin": "solid",
+                "thick": "solid",
+                "hair": "solid",
+                "dash": "dashed",
+                "dashed": "dashed",
+                "dashdot": "dashed",
+                "mediumdashed": "dashed",
+                "mediumdashdot": "dashed",
+                "slantdashdot": "dashed",
+                "dot": "dotted",
+                "dotted": "dotted",
+                "hairline": "dotted",
+                "mediumdashdotdot": "dotted",
+                "dashdotdot": "dotted",
+                "double": "double",
+            };
+            this.excelBorderWeights = {
+                "thin": "1px",
+                "medium": "1px",
+                "thick": "2px",
+                "hair": "1px",
+                "hairline": "1px",
+                "double": "3px",
+            };
+            this.ignoreStyles = [
+                "number-format",
+            ];
+        }
+        PageStyles.decompressStyles = function (content) {
+            var styler = new PageStyles();
+            for (var i = 0; i < content.length; i++) {
+                for (var j = 0; j < content[i].length; j++) {
+                    content[i][j].style = styler.makeStyle(content[i][j].style);
+                }
+            }
+            return content;
+        };
+        PageStyles.prototype.makeStyle = function (cellStyle) {
+            var styleName, style = angular.copy(cellStyle);
+            for (var item in style) {
+                if (this.ignoreStyles.indexOf(item) >= 0) {
+                    continue;
+                }
+                styleName = this.excelToCSS(item);
+                var prefix = "", suffix = "";
+                if ((styleName === "color" || styleName === "background-color") && style[item] !== "none") {
+                    prefix = "#";
+                }
+                if (styleName === "font-family") {
+                    suffix = ", Arial, Helvetica, sans-serif";
+                }
+                if (styleName === "white-space") {
+                    style[item] = (style[item] === "normal") ? "pre" : "pre-wrap";
+                }
+                if (styleName === "width" || styleName === "height") {
+                    suffix = " !important";
+                }
+                if (styleName.indexOf("border") >= 0) {
+                    var pos = styleName.split("-")[1];
+                    if (styleName.indexOf("-style") >= 0) {
+                        this.currentBorders[pos].style = this.excelBorderStyles[style[item]] || undefined;
+                    }
+                    if (styleName.indexOf("-width") >= 0) {
+                        this.currentBorders[pos].width = (style[item] !== "none") ? this.excelBorderWeights[style[item]] : undefined;
+                    }
+                    if (styleName.indexOf("-color") >= 0) {
+                        this.currentBorders[pos].color = (style[item] === "none") ? "transparent" : "#" + style[item];
+                    }
+                    continue;
+                }
+                this.currentStyle[styleName] = prefix + style[item] + suffix;
+            }
+            return angular.copy(this.currentStyle);
+        };
+        PageStyles.prototype.reset = function () {
+            this.currentStyle = {};
+            this.currentBorders = { top: {}, right: {}, bottom: {}, left: {} };
+        };
+        PageStyles.prototype.excelToCSS = function (val) {
+            return (this.excelStyles[val]) ? this.excelStyles[val] : val;
+        };
+        PageStyles.prototype.CSSToExcel = function (val) {
+            var excelVal = val;
+            for (var style in this.excelStyles) {
+                if (this.excelStyles[style] === val) {
+                    excelVal = style;
+                    break;
+                }
+            }
+            return excelVal;
+        };
+        PageStyles.prototype.excelBorderWeight = function (pixels) {
+            var bWeight = "";
+            for (var weight in this.excelBorderWeights) {
+                if (this.excelBorderWeights[weight] === pixels) {
+                    bWeight = weight;
+                    break;
+                }
+            }
+            return bWeight;
+        };
+        return PageStyles;
+    }());
 })(ipushpull || (ipushpull = {}));
