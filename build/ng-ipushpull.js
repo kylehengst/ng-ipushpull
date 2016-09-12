@@ -7938,6 +7938,8 @@ var ipushpull;
             });
             this._provider.on("meta_update", function (data) {
                 data.special_page_type = _this.updatePageType(data.special_page_type);
+                delete data.content;
+                delete data.encrypted_content;
                 _this._data = angular.merge({}, _this._data, data);
                 _this.emit(Page.EVENT_NEW_META, data);
             });
@@ -8239,7 +8241,14 @@ var ipushpull;
                 }
                 this.currentStyle[styleName] = prefix + style[item] + suffix;
             }
-            return angular.copy(this.currentStyle);
+            var resultStyles = angular.copy(this.currentStyle);
+            for (var borderPos in this.currentBorders) {
+                if (typeof this.currentBorders[borderPos].style === "undefined" || !this.currentBorders[borderPos].style) {
+                    continue;
+                }
+                resultStyles["border-" + borderPos] = this.currentBorders[borderPos].width + " " + this.currentBorders[borderPos].style + " " + this.currentBorders[borderPos].color + ";";
+            }
+            return resultStyles;
         };
         PageStyles.prototype.reset = function () {
             this.currentStyle = {};
