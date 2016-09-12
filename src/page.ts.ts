@@ -6,6 +6,7 @@
  * @todo expose function to trigger decryption
  * @todo alter page special page type for better manipulation later (reports 1000+)
  * @todo proper interfaces and constants
+ * @todo parse all styles - convert from our model to cell-by-cell model
  */
 namespace ipushpull {
     "use strict";
@@ -17,7 +18,7 @@ namespace ipushpull {
         address: string;
     }
 
-    export interface IPageContentStyle {
+    export interface IPageCellStyle {
         "background-color"?: string;
         "color"?: string;
         "font-family"?: string;
@@ -47,7 +48,7 @@ namespace ipushpull {
         value: string | number;
         formatted_value: string | number;
         link?: IPageContentLink;
-        style?: IPageContentStyle;
+        style?: IPageCellStyle;
     }
 
     export interface IPageContent {
@@ -294,6 +295,9 @@ namespace ipushpull {
                 } else {
                     this.decrypted = true;
                 }
+
+                // Decompress styles
+                data.content = PageStyles.decompressStyles(data.content);
 
                 this._data = angular.merge({}, this._data, data);
 
@@ -567,6 +571,212 @@ namespace ipushpull {
                 });
             }
         };
+    }
+
+    class PageStyles {
+        private currentStyle: IPageCellStyle = {};
+        private currentBorders: any = {top: {}, right: {}, bottom: {}, left: {}};
+
+        /**
+         * Linking names of excel/json styles to css styles
+         * @type {{text-wrap: string, tbs: string, rbs: string, bbs: string, lbs: string, tbc: string, rbc: string, bbc: string, lbc: string, tbw: string, rbw: string, bbw: string, lbw: string}}
+         */
+        private excelStyles: any = {
+            "text-wrap": "white-space",
+            "tbs": "border-top-style",
+            "rbs": "border-right-style",
+            "bbs": "border-bottom-style",
+            "lbs": "border-left-style",
+            "tbc": "border-top-color",
+            "rbc": "border-right-color",
+            "bbc": "border-bottom-color",
+            "lbc": "border-left-color",
+            "tbw": "border-top-width",
+            "rbw": "border-right-width",
+            "bbw": "border-bottom-width",
+            "lbw": "border-left-width",
+        };
+
+        /**
+         * Map excel border styles to css border styles (with some compromise)
+         * @type {{solid: string, thin: string, thick: string, hair: string, dash: string, dashed: string, dashdot: string, mediumdashed: string, mediumdashdot: string, slantdashdot: string, dot: string, dotted: string, hairline: string, mediumdashdotdot: string, dashdotdot: string, double: string}}
+         */
+        private excelBorderStyles: any = {
+            "solid": "solid",
+            "thin": "solid",
+            "thick": "solid",
+            "hair": "solid",
+
+            "dash": "dashed",
+            "dashed": "dashed",
+            "dashdot": "dashed",
+            "mediumdashed": "dashed",
+            "mediumdashdot": "dashed",
+            "slantdashdot": "dashed",
+
+            "dot": "dotted",
+            "dotted": "dotted",
+            "hairline": "dotted",
+            "mediumdashdotdot": "dotted", // @todo: Hairline is weight not style in excel (Whaaaat??),
+            "dashdotdot": "dotted",
+
+            "double": "double",
+        };
+
+        /**
+         * Map excel border weights to css border weights (with some compromise)
+         * @type {{thin: string, medium: string, thick: string, hair: string, hairline: string, double: string}}
+         */
+        private excelBorderWeights = {
+            "thin": "1px",
+            "medium": "1px",
+            "thick": "2px",
+            "hair": "1px",
+            "hairline": "1px",
+            "double": "3px",
+        };
+
+        /**
+         * Styles to be ignored when rendering styles from excel/json - these styles cannot be represented in css
+         * @type {string[]}
+         */
+        private ignoreStyles: string[] = [
+            "number-format",
+        ];
+
+        public static decompressStyles(content: IPageContent): IPageContent {
+            let styler = new PageStyles();
+
+            for (let i: number = 0; i < content.length; i++){
+                for (let j: number = 0; j < content[i].length; j++) {
+                    content[i][j].style = styler.makeStyle(content[i][j].style);
+                }
+            }
+
+            return content;
+        }
+
+        /**
+         * Parses cell styles from provided style rules.
+         *
+         * @param styleOrig
+         * @returns {string}
+         */
+        public makeStyle(cellStyle: IPageCellStyle): IPageCellStyle {
+            let styleName: string,
+                style: IPageCellStyle = angular.copy(cellStyle);
+
+            for (let item in style) {
+                if (this.ignoreStyles.indexOf(item) >= 0) {
+                    continue;
+                }
+
+                styleName = this.excelToCSS(item);
+
+                let prefix: string = "",
+                    suffix: string = "";
+
+                if ((styleName === "color" || styleName === "background-color") && style[item] !== "none") {
+                    prefix = "#";
+                }
+
+                if (styleName === "font-family") {
+                    suffix = ", Arial, Helvetica, sans-serif";
+                }
+
+                if (styleName === "white-space") {
+                    style[item] = (style[item] === "normal") ? "pre" : "pre-wrap";
+                }
+
+                if (styleName === "width" || styleName === "height") {
+                    suffix = " !important";
+                }
+
+                if (styleName.indexOf("border") >= 0) {
+                    let pos: string = styleName.split("-")[1];
+
+                    if (styleName.indexOf("-style") >= 0) {
+                        this.currentBorders[pos].style = this.excelBorderStyles[style[item]] || undefined;
+                    }
+
+                    if (styleName.indexOf("-width") >= 0) {
+                        this.currentBorders[pos].width = (style[item] !== "none") ? this.excelBorderWeights[style[item]] : undefined; // use current value if not in array (if supplied number of px)
+                    }
+
+                    if (styleName.indexOf("-color") >= 0) {
+                        this.currentBorders[pos].color = (style[item] === "none") ? "transparent" : "#" + style[item];
+                    }
+
+                    continue;
+                }
+
+                this.currentStyle[styleName] = prefix + style[item] + suffix;
+            }
+
+            /*var inlineStyle = '';
+            for (item in currentStyle) {
+                inlineStyle += item + ': ' + currentStyle[item] + ';';
+            }
+
+            // Process currentBorders
+            for (var borderPos in currentBorders) {
+                if (typeof currentBorders[borderPos].style === 'undefined' || !currentBorders[borderPos].style) continue;
+
+                inlineStyle += 'border-' + borderPos + ': ' + currentBorders[borderPos].width + ' ' + currentBorders[borderPos].style + ' ' + currentBorders[borderPos].color + ';';
+            }*/
+
+            return angular.copy(this.currentStyle);
+        }
+
+        public reset(): void{
+            this.currentStyle = {};
+            this.currentBorders = {top: {}, right: {}, bottom: {}, left: {}};
+        }
+
+        /**
+         * Helper function to get right css name of style based on excel name
+         * @param val
+         * @returns {*}
+         */
+        private excelToCSS(val: string): string {
+            return (this.excelStyles[val]) ? this.excelStyles[val] : val;
+        }
+
+        /**
+         * Helper function to get right excel style name based on css name
+         * @param val
+         * @returns {*}
+         * @constructor
+         */
+        private CSSToExcel(val: string): string {
+            let excelVal: string = val;
+            for (let style in this.excelStyles) {
+                if (this.excelStyles[style] === val) {
+                    excelVal = style;
+                    break;
+                }
+            }
+
+            return excelVal;
+        }
+
+        /**
+         * Helper to get excel border weight value based on css pixel value
+         * @param pixels
+         * @returns {string}
+         */
+        private excelBorderWeight(pixels: number): string {
+            let bWeight: string = "";
+
+            for (let weight in this.excelBorderWeights) {
+                if (this.excelBorderWeights[weight] === pixels) {
+                    bWeight = weight;
+                    break;
+                }
+            }
+
+            return bWeight;
+        }
     }
 
     // ipushpull.page.module.service("ippPageProviderSocket", ProviderSocket);

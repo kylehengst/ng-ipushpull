@@ -3,7 +3,7 @@ declare namespace ipushpull {
         external: boolean;
         address: string;
     }
-    interface IPageContentStyle {
+    interface IPageCellStyle {
         "background-color"?: string;
         "color"?: string;
         "font-family"?: string;
@@ -32,7 +32,7 @@ declare namespace ipushpull {
         value: string | number;
         formatted_value: string | number;
         link?: IPageContentLink;
-        style?: IPageContentStyle;
+        style?: IPageCellStyle;
     }
     interface IPageContent {
         [index: number]: IPageContentCell[];
