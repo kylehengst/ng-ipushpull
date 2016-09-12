@@ -1,7 +1,7 @@
 {
   "name": "ng-ipushpull",
   "description": "IPushPull Angular module",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "author": {
     "name": "iPushPull"
   },
@@ -21,9 +21,13 @@
     "Collaboration"
   ],
   "ignore": [
-    "**/.*",
+    "tsconfig.json",
+    "tslint.json",
+    "typings.json",
+    "Gruntfile.js",
     "node_modules",
-    "components"
+    "components",
+    "src"
   ],
   "dependencies": {
     "angular": ">= 1.2.0"
