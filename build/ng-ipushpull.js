@@ -7608,7 +7608,7 @@ var ipushpull;
             });
             return r.then(this.handleSuccess, this.handleError);
         };
-        Api.$inject = ["$http", "$httpParamSerializerJQLike", "$q", "ippAuth", "ipushpull_conf"];
+        Api.$inject = ["$http", "$httpParamSerializerJQLike", "$q", "ippAuthService", "ipushpull_conf"];
         return Api;
     }());
     ipushpull.module.service("ippApiService", Api);
@@ -7757,7 +7757,7 @@ var ipushpull;
         };
         return Crypto;
     }());
-    ipushpull.module.factory("ippCrypto", Crypto._instance);
+    ipushpull.module.factory("ippCryptoService", Crypto._instance);
 })(ipushpull || (ipushpull = {}));
 
 var __extends = (this && this.__extends) || function (d, b) {
@@ -7782,7 +7782,7 @@ var ipushpull;
             config = angular.merge({}, defaults, ippConf);
             return Page;
         }
-        PageWrap.$inject = ["$q", "$timeout", "ippApi", "ippAuth", "ippCrypto", "ipushpull_conf"];
+        PageWrap.$inject = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippCryptoService", "ipushpull_conf"];
         return PageWrap;
     }());
     ipushpull.module.service("ippPageService", PageWrap);

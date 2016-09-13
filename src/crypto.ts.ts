@@ -93,5 +93,5 @@ namespace ipushpull {
         }
     }
 
-    ipushpull.module.factory("ippCrypto", Crypto._instance);
+    ipushpull.module.factory("ippCryptoService", Crypto._instance);
 }

@@ -129,7 +129,7 @@ namespace ipushpull {
     let $q, $timeout, api, auth, crypto, config;
 
     class PageWrap {
-        public static $inject: string[] = ["$q", "$timeout", "ippApi", "ippAuth", "ippCrypto", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippCryptoService", "ipushpull_conf"];
 
         constructor(q, timeout, ippApi, ippAuth, ippCrypto, ippConf){
             // @todo This should not be here

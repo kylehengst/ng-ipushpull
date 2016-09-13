@@ -162,7 +162,7 @@ namespace ipushpull {
     }
 
     class Api implements IApiService {
-        public static $inject: string[] = ["$http", "$httpParamSerializerJQLike", "$q", "ippAuth", "ipushpull_conf"];
+        public static $inject: string[] = ["$http", "$httpParamSerializerJQLike", "$q", "ippAuthService", "ipushpull_conf"];
 
         private _endPoint: string;
 
