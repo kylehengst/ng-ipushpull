@@ -7631,36 +7631,42 @@ var ipushpull;
             this.$httpParamSerializerJQLike = $httpParamSerializerJQLike;
             this.config = config;
         }
+        Object.defineProperty(Auth, "EVENT_LOGGED_IN", {
+            get: function () { return "logged_in"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Auth, "EVENT_RE_LOGGED_IN", {
+            get: function () { return "re_logged"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Auth, "EVENT_LOGGED_OUT", {
+            get: function () { return "logged_out"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Auth, "EVENT_ERROR", {
+            get: function () { return "error"; },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Auth.prototype, "token", {
             get: function () { return this._accessToken; },
             enumerable: true,
             configurable: true
         });
-        Auth.prototype.login = function (username, password) {
-            var _this = this;
+        Auth.prototype.authenticate = function () {
             var q = this.$q.defer();
-            this.$http({
-                method: "POST",
-                data: this.$httpParamSerializerJQLike({
-                    grant_type: "password",
-                    client_id: this.config.api_key,
-                    client_secret: this.config.api_secret,
-                    username: username,
-                    password: password,
-                }),
-                url: this.config.url + "/api/1.0/oauth/token/",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-            }).then(function (res) {
-                _this._accessToken = res.data.access_token;
-                _this._refreshToken = res.data.refresh_token;
-                _this.emit("logged_in");
+            if (this._accessToken) {
                 q.resolve();
-            }, function (err) {
-                _this.emit("error", err);
-                q.reject(err);
-            });
+            }
+            else if (this._refreshToken) {
+                return this.refreshTokens();
+            }
+            else {
+                q.reject("No tokens available");
+            }
             return q.promise;
         };
         Auth.prototype.refreshTokens = function () {
@@ -7686,16 +7692,43 @@ var ipushpull;
             }).then(function (res) {
                 _this._accessToken = res.data.access_token;
                 _this._refreshToken = res.data.refresh_token;
-                _this.emit("re_logged");
+                _this.emit(Auth.EVENT_RE_LOGGED_IN);
                 q.resolve();
             }, function (err) {
-                _this.emit("error", err);
+                _this.emit(Auth.EVENT_ERROR, err);
+                q.reject(err);
+            });
+            return q.promise;
+        };
+        Auth.prototype.login = function (username, password) {
+            var _this = this;
+            var q = this.$q.defer();
+            this.$http({
+                method: "POST",
+                data: this.$httpParamSerializerJQLike({
+                    grant_type: "password",
+                    client_id: this.config.api_key,
+                    client_secret: this.config.api_secret,
+                    username: username,
+                    password: password,
+                }),
+                url: this.config.url + "/api/1.0/oauth/token/",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+            }).then(function (res) {
+                _this._accessToken = res.data.access_token;
+                _this._refreshToken = res.data.refresh_token;
+                _this.emit(Auth.EVENT_LOGGED_IN);
+                q.resolve();
+            }, function (err) {
+                _this.emit(Auth.EVENT_ERROR, err);
                 q.reject(err);
             });
             return q.promise;
         };
         Auth.prototype.logout = function () {
-            this.emit("logged_out");
+            this.emit(Auth.EVENT_LOGGED_OUT);
             this._accessToken = undefined;
             this._refreshToken = undefined;
         };

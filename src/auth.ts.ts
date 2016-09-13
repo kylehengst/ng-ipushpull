@@ -2,62 +2,72 @@
  * Todo list
  * ------------------------------
  * @todo Load user data on login
+ * @todo Need to persist tokens somehow...
  */
 
 namespace ipushpull {
     "use strict";
     import IQService = angular.IQService;
-    import IHttpService = angular.IHttpService;
-    import IHttpParamSerializer = angular.IHttpParamSerializer;
     import IPromise = angular.IPromise;
     import IDeferred = angular.IDeferred;
 
     export interface IAuthService {
-        token: string;
+        user: IUserSelf;
 
+        authenticate: () => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
         refreshTokens: () => IPromise<any>;
     }
 
+    export interface IUserSelf {
+        id: number;
+        url: string;
+        email: string;
+        screen_name: string;
+        first_name: string;
+        last_name: string;
+        mobile_phone_number: string;
+        pushbullet_id: string;
+        default_domain_id: number;
+        default_page_id: number;
+        default_domain_name: string;
+        default_page_name: string;
+        pending_invitation_count: number;
+        can_create_folders: boolean;
+        meta_data: any[];
+    }
+
     class Auth extends EventEmitter {
-        public static $inject: string[] = ["$q", "$http", "$httpParamSerializerJQLike", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
 
-        private _accessToken: string;
-        private _refreshToken: string;
+        public static get EVENT_LOGGED_IN(): string { return "logged_in"; }
+        public static get EVENT_RE_LOGGED_IN(): string { return "re_logged"; }
+        public static get EVENT_LOGGED_OUT(): string { return "logged_out"; }
+        public static get EVENT_ERROR(): string { return "error"; }
 
-        public get token(): string {return this._accessToken; }
+        private _user: IUserSelf | any = {};
 
-        constructor(private $q: IQService, private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private config: any){
+        public get user(): IUserSelf { return this._user; }
+
+        constructor(private $q: IQService, private ippApi: IApiService, private storage, private config: any){
             super();
         }
 
-        public login(username: string, password: string): IPromise<any> {
+        // @todo better name?
+        // @todo need to get user info
+        public authenticate(): IPromise<any>{
             let q: IDeferred<any> = this.$q.defer();
 
-            this.$http({
-                method: "POST",
-                data: this.$httpParamSerializerJQLike({
-                    grant_type: "password",
-                    client_id: this.config.api_key,
-                    client_secret: this.config.api_secret,
-                    username: username,
-                    password: password,
-                }),
-                url: `${this.config.url}/api/1.0/oauth/token/`,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-            }).then((res: any) => {
-                this._accessToken = res.data.access_token;
-                this._refreshToken = res.data.refresh_token;
-
-                this.emit("logged_in");
-
-                q.resolve();
-            }, (err) => {
-                this.emit("error", err);
-                q.reject(err);
-            });
+            if (this.storage.get("access_token")){
+                this.getUserInfo().then(() => {
+                    this.emit(Auth.EVENT_LOGGED_IN); // @todo Actually at this moment we have no idea if access token is valid
+                    q.resolve();
+                }); // @todo Error?
+            } else if (this.storage.get("refresh_token")) {
+                return this.refreshTokens();
+            } else {
+                q.reject("No tokens available");
+            }
 
             return q.promise;
         }
@@ -65,33 +75,54 @@ namespace ipushpull {
         public refreshTokens(): IPromise<any> {
             let q: IDeferred<any> = this.$q.defer();
 
-            if (!this._refreshToken){
+            let refreshToken: string = this.storage.get("refresh_token");
+
+            if (!refreshToken){
                 this.logout();
                 q.reject();
                 return q.promise;
             }
 
-            this.$http({
-                method: "POST",
-                data: this.$httpParamSerializerJQLike({
-                    grant_type: "refresh_token",
-                    client_id: this.config.api_key,
-                    client_secret: this.config.api_secret,
-                    refresh_token: this._refreshToken,
-                }),
-                url: `${this.config.url}/api/1.0/oauth/token/`,
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-            }).then((res: any) => {
-                this._accessToken = res.data.access_token;
-                this._refreshToken = res.data.refresh_token;
+            this.ippApi.refreshAccessTokens(refreshToken).then((res) => {
+                this.storage.create("access_token", res.data.access_token);
+                this.storage.create("refresh_token", res.data.refresh_token);
 
-                this.emit("re_logged");
+                this.emit(Auth.EVENT_RE_LOGGED_IN); // @todo do we need this?
+                this.emit(Auth.EVENT_LOGGED_IN);
 
                 q.resolve();
             }, (err) => {
-                this.emit("error", err);
+                this.emit(Auth.EVENT_ERROR, err);
+                q.reject(err);
+            });
+
+            return q.promise;
+        }
+
+        // @todo What a mess...
+        public login(username: string, password: string): IPromise<any> {
+            let q: IDeferred<any> = this.$q.defer();
+
+            this.ippApi.userLogin({
+                grant_type: "password",
+                client_id: this.config.api_key,
+                client_secret: this.config.api_secret,
+                email: username,
+                password: password,
+            }).then((res) => {
+                this.storage.create("access_token", res.data.access_token);
+                this.storage.create("refresh_token", res.data.refresh_token);
+
+                this.getUserInfo().then(() => {
+                    this.emit(Auth.EVENT_LOGGED_IN);
+                    q.resolve();
+                }, (err) => {
+                    this.emit(Auth.EVENT_ERROR, err);
+                    q.reject(err);
+                }); // @todo error ?
+
+            }, (err) => {
+                this.emit(Auth.EVENT_ERROR, err);
                 q.reject(err);
             });
 
@@ -99,10 +130,24 @@ namespace ipushpull {
         }
 
         public logout(): void{
-            this.emit("logged_out");
+            this.emit(Auth.EVENT_LOGGED_OUT);
 
-            this._accessToken = undefined;
-            this._refreshToken = undefined;
+            this.storage.remove("access_token");
+            this.storage.remove("refresh_token");
+        }
+
+        private getUserInfo(): IPromise<IUserSelf> {
+            let q: IDeferred<IUserSelf> = this.$q.defer();
+
+            this.ippApi.getSelfInfo().then((res) => {
+                this._user = res.data;
+                q.resolve();
+            }, (err) => {
+                this.emit(Auth.EVENT_ERROR, err);
+                q.reject(err);
+            });
+
+            return q.promise;
         }
     }
 

@@ -6,6 +6,8 @@ namespace ipushpull {
     import IQService = angular.IQService;
     import IPromise = angular.IPromise;
     import IDeferred = angular.IDeferred;
+    import IInjectorService = angular.auto.IInjectorService;
+    import IHttpRequestConfigHeaders = angular.IHttpRequestConfigHeaders;
 
     interface IRequest{
         method: (method: string) => IRequest;
@@ -162,11 +164,12 @@ namespace ipushpull {
     }
 
     class Api implements IApiService {
-        public static $inject: string[] = ["$http", "$httpParamSerializerJQLike", "$q", "ippAuthService", "ipushpull_conf"];
+        public static $inject: string[] = ["$http", "$httpParamSerializerJQLike", "$q", "$injector", "ippGlobalStorageService", "ipushpull_conf"];
 
         private _endPoint: string;
+        private _locked: boolean = false;
 
-        constructor(private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private $q: IQService, private auth: IAuthService, private config: IIPPConfig){
+        constructor(private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private $q: IQService, private $injector: IInjectorService, private storage, private config: IIPPConfig){
             this._endPoint = `${this.config.url}/api/1.0/`;
 
             return;
@@ -454,17 +457,18 @@ namespace ipushpull {
 
         private send(request: Request): IPromise<IRequestResult> {
             // Add auth header
+            let token: string = this.storage.get("access_token");
             request.headers({
-                "Authorization": `Bearer ${(this.auth.token) ? this.auth.token : "null"}`,
+                "Authorization": `Bearer ${(token) ? token : "null"}`,
             });
 
-            // let provider = (this.$rootScope.blockApi && !request.OVERRIDE_LOCK) ? this.dummyRequest : this.$http;
-            let provider: IHttpService = this.$http;
+            // @todo Proper type...
+            let provider: any = (this._locked && !request.OVERRIDE_LOCK) ? this.dummyRequest : this.$http;
 
             // for now, disabled cache on all requests
             request.cache(false);
 
-            // Add micro time to get requests - !!STUPID IE!!
+            // @todo Add micro time to get requests - !!STUPID IE!!
             /*if (request.METHOD === "GET" && ipp.config.isIE){
                 request.params({ie: new Date().getTime()});
             }*/
@@ -481,19 +485,19 @@ namespace ipushpull {
             return r.then(this.handleSuccess, this.handleError);
         }
 
-        /*private dummyRequest(data: any): IPromise<any> {
-            this._logger.log("Api is locked down, preventing call " + data.url);
+        private dummyRequest = (data: any): IPromise<any> => {
+            console.log("Api is locked down, preventing call " + data.url);
 
-            let q = this.$q.defer();
+            let q: IDeferred<any> = this.$q.defer();
 
             q.reject({
                 data: {},
                 status: 666,
-                statusText: "Api is locked"
+                statusText: "Api is locked",
             });
 
             return q.promise;
-        }*/
+        };
 
         private handleSuccess = (response: any): IPromise<IRequestResult> => {
             let q: IDeferred<IRequestResult> = this.$q.defer();
@@ -512,8 +516,22 @@ namespace ipushpull {
             let q: IDeferred<IRequestResult> = this.$q.defer();
 
             // Run authentication if 401
-            if (parseInt(response.status, 10) === 401){
-                this.auth.refreshTokens();
+            if (parseInt(response.status, 10) === 401 && !this._locked && response.data.error !== "invalid_grant"){
+                // Lock down api
+                this._locked = true;
+
+                // Make sure access token is gone
+                this.storage.remove("access_token");
+
+                let ippAuth: IAuthService = this.$injector.get("ippAuthService");
+
+                // Attempt to re-log in
+                ippAuth.authenticate().finally(() => {
+                    // Unblock api again
+                    console.log("Api is unlocked");
+                    this._locked = false;
+                    q.resolve();
+                });
             }
 
             q.reject({

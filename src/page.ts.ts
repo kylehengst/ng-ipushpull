@@ -126,14 +126,14 @@ namespace ipushpull {
     }
 
     // Main/public page service
-    let $q, $timeout, api, auth, crypto, config;
+    let $q, $timeout, api, storage, crypto, config;
 
     class PageWrap {
-        public static $inject: string[] = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippCryptoService", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "$timeout", "ippApiService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
 
-        constructor(q, timeout, ippApi, ippAuth, ippCrypto, ippConf){
+        constructor(q, timeout, ippApi, ippStorage, ippCrypto, ippConf){
             // @todo This should not be here
-            // @todo Handle last "/"
+            // @todo Handle last "/" in url
             let defaults: any = {
                 url: "https://www.ipushpull.com",
             };
@@ -141,7 +141,7 @@ namespace ipushpull {
             $q = q;
             $timeout = timeout;
             api = ippApi;
-            auth = ippAuth;
+            storage = ippStorage;
             crypto = ippCrypto;
             config = angular.merge({}, defaults, ippConf);
 
@@ -543,7 +543,7 @@ namespace ipushpull {
 
         private connect(): Socket {
             let query: string[] = [
-                `access_token=${auth.token}`,
+                `access_token=${storage.get("access_token")}`,
             ];
 
             query = query.filter((val: string) => {
@@ -579,12 +579,9 @@ namespace ipushpull {
         };
 
         private onOAuthError = (data): void => {
-            if (data.error === "expired_token"){
-                auth.refreshTokens().then(() => {
-                    // Reconnect socket
-                    this.start();
-                });
-            }
+            // @todo Do something
+
+            // @todo should we watch auth service for re-logged and re-connect?
         };
     }
 
