@@ -7,10 +7,9 @@
     "declaration": true
   },
   "exclude": [
-    "node_modules",
     "bower_components",
-    "embed",
-//    "libs",
-    "test"
+    "build",
+    "node_modules",
+    "test_app"
   ]
 }

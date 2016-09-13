@@ -1,8 +1,23 @@
+/**
+ * Todo list
+ * ------------------------------
+ * @todo Load user data on login
+ */
+
 namespace ipushpull {
     "use strict";
     import IQService = angular.IQService;
     import IHttpService = angular.IHttpService;
     import IHttpParamSerializer = angular.IHttpParamSerializer;
+    import IPromise = angular.IPromise;
+    import IDeferred = angular.IDeferred;
+
+    export interface IAuthService {
+        token: string;
+
+        login: (username: string, password: string) => IPromise<any>;
+        refreshTokens: () => IPromise<any>;
+    }
 
     class Auth extends EventEmitter {
         public static $inject: string[] = ["$q", "$http", "$httpParamSerializerJQLike", "ipushpull_conf"];
@@ -16,8 +31,8 @@ namespace ipushpull {
             super();
         }
 
-        public login(username: string, password: string) {
-            let q = this.$q.defer();
+        public login(username: string, password: string): IPromise<any> {
+            let q: IDeferred<any> = this.$q.defer();
 
             this.$http({
                 method: "POST",
@@ -32,7 +47,7 @@ namespace ipushpull {
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-            }).then((res) => {
+            }).then((res: any) => {
                 this._accessToken = res.data.access_token;
                 this._refreshToken = res.data.refresh_token;
 
@@ -47,8 +62,8 @@ namespace ipushpull {
             return q.promise;
         }
 
-        public refreshTokens() {
-            let q = this.$q.defer();
+        public refreshTokens(): IPromise<any> {
+            let q: IDeferred<any> = this.$q.defer();
 
             if (!this._refreshToken){
                 this.logout();
@@ -68,7 +83,7 @@ namespace ipushpull {
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-            }).then((res) => {
+            }).then((res: any) => {
                 this._accessToken = res.data.access_token;
                 this._refreshToken = res.data.refresh_token;
 
@@ -91,5 +106,5 @@ namespace ipushpull {
         }
     }
 
-    ipushpull.module.service("ippAuth", Auth);
+    ipushpull.module.service("ippAuthService", Auth);
 }

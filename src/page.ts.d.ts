@@ -35,6 +35,7 @@ declare namespace ipushpull {
         style?: IPageCellStyle;
     }
     interface IPageContent {
+        length: number;
         [index: number]: IPageContentCell[];
     }
     interface IPageServiceContent {

@@ -12,6 +12,7 @@ namespace ipushpull {
     "use strict";
     import IDeferred = angular.IDeferred;
     import Socket = SocketIOClient.Socket;
+    import IPromise = angular.IPromise;
 
     export interface IPageContentLink {
         external: boolean;
@@ -52,6 +53,7 @@ namespace ipushpull {
     }
 
     export interface IPageContent {
+        length: number; // Hack
         [index: number]: IPageContentCell[];
     }
 
@@ -147,7 +149,7 @@ namespace ipushpull {
         }
     }
 
-    ipushpull.module.service("ippPage", PageWrap);
+    ipushpull.module.service("ippPageService", PageWrap);
 
     // @todo extend event emitter interface
     export interface IPageService {
@@ -183,7 +185,7 @@ namespace ipushpull {
         private _supportsWS: boolean = true; // let's be optimistic by default
         private _provider;
 
-        private _data;
+        private _data: IPage;
         private _pageId: number;
         private _folderId: number;
         private _pageName: string;
@@ -191,17 +193,18 @@ namespace ipushpull {
 
         private _passphrase: string = "";
 
-        constructor(pageId?: string | number, folderId?: string | number, autoStart: boolean = true){
+        // @todo Using type "any" for page and folder ids, because string | number throws compiler error http://stackoverflow.com/questions/39467714
+        constructor(pageId?: any, folderId?: any, autoStart: boolean = true){
             super();
 
             // Decide if client can use websockets
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
 
             // Process page and folder id/name
-            this._folderId = (!isNaN(folderId)) ? folderId : undefined;
-            this._pageId = (!isNaN(pageId)) ? pageId : undefined;
-            this._folderName = (isNaN(folderId)) ? folderId : undefined;
-            this._pageName = (isNaN(pageId)) ? pageId : undefined;
+            this._folderId = (!isNaN(+folderId)) ? folderId : undefined;
+            this._pageId = (!isNaN(+pageId)) ? pageId : undefined;
+            this._folderName = (isNaN(+folderId)) ? folderId : undefined;
+            this._pageName = (isNaN(+pageId)) ? pageId : undefined;
 
             // If we dont have page id, cannot start autopulling
             // @todo Should we emit some error to user?
@@ -243,7 +246,7 @@ namespace ipushpull {
 
         public destroy(): void {
             this._provider.destroy();
-            this.removeAllListeners();
+            this.removeEvent();
         }
 
         private init(autoStart: boolean = true): void{
@@ -307,7 +310,7 @@ namespace ipushpull {
 
             this._provider.on("meta_update", (data) => {
                 data.special_page_type = this.updatePageType(data.special_page_type);
-                
+
                 // Remove content fields (should not be here and in the future will not be here)
                 delete data.content;
                 delete data.encrypted_content;
@@ -392,6 +395,11 @@ namespace ipushpull {
             clearTimeout(this._timer);
         }
 
+        public destroy(): void {
+            this.stop();
+            this.removeEvent();
+        }
+
         private startPolling(): void {
             this.load();
 
@@ -400,8 +408,8 @@ namespace ipushpull {
             }, this._timeout);
         }
 
-        private load(ignoreSeqNo: boolean = false) {
-            let q: IDeferred = $q.defer();
+        private load(ignoreSeqNo: boolean = false): IPromise<IPage> {
+            let q: IDeferred<IPage> = $q.defer();
 
             // @todo Returning promise, and rejecting before return? need test
             if (this._requestOngoing || this._stopped){
@@ -415,7 +423,7 @@ namespace ipushpull {
             api.getPage({
                 domainId: this._folderId,
                 pageId: this._pageId,
-                seq_no: (!ignoreSeqNo) ? this._seqNo : null
+                seq_no: (!ignoreSeqNo) ? this._seqNo : undefined,
             }).then((res) => {
                 if (res.httpCode === 200 || res.httpCode === 204) {
                     // New update
@@ -479,8 +487,6 @@ namespace ipushpull {
         }
     }
 
-    // ipushpull.page.module.service("ippPageProviderRest", ProviderREST);
-
     // Page sockets service
     class ProviderSocket extends EventEmitter implements IPageProvider {
         public static get SOCKET_EVENT_PAGE_ERROR(): string { return "page_error"; }
@@ -528,6 +534,11 @@ namespace ipushpull {
             this._socket.disconnect();
 
             this._stopped = true;
+        }
+
+        public destroy(): void {
+            this.stop();
+            this.removeEvent();
         }
 
         private connect(): Socket {
@@ -716,7 +727,7 @@ namespace ipushpull {
 
                 this.currentStyle[styleName] = prefix + style[item] + suffix;
             }
-            
+
             let resultStyles: IPageCellStyle = angular.copy(this.currentStyle);
 
             // Process currentBorders
@@ -782,6 +793,4 @@ namespace ipushpull {
             return bWeight;
         }
     }
-
-    // ipushpull.page.module.service("ippPageProviderSocket", ProviderSocket);
 }
