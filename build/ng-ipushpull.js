@@ -7383,7 +7383,7 @@ var ipushpull;
                     success: false,
                     data: response.data,
                     httpCode: parseInt(response.status, 10),
-                    httpText: response.statusText
+                    httpText: response.statusText,
                 });
                 return q.promise;
             };
@@ -7581,16 +7581,16 @@ var ipushpull;
             return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/customers/" + data.customerId + "/"));
         };
         Api.prototype.getDocEmailRules = function (data) {
-            return this.send(Request.get(this._endPoint2 + "domains/" + data.domainId + "/docsnames/"));
+            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/docsnames/"));
         };
         Api.prototype.createDocEmailRule = function (data) {
-            return this.send(Request.post(this._endPoint2 + "domains/" + data.domainId + "/docsnames/").data(data.data));
+            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/docsnames/").data(data.data));
         };
         Api.prototype.updateDocEmailRule = function (data) {
-            return this.send(Request.put(this._endPoint2 + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/").data(data.data));
+            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/").data(data.data));
         };
         Api.prototype.deleteDocEmailRule = function (data) {
-            return this.send(Request.del(this._endPoint2 + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
+            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
         };
         Api.prototype.send = function (request) {
             request.headers({
@@ -7611,7 +7611,7 @@ var ipushpull;
         Api.$inject = ["$http", "$httpParamSerializerJQLike", "$q", "ippAuth", "ipushpull_conf"];
         return Api;
     }());
-    ipushpull.module.service("ippApi", Api);
+    ipushpull.module.service("ippApiService", Api);
 })(ipushpull || (ipushpull = {}));
 
 var __extends = (this && this.__extends) || function (d, b) {
@@ -7702,7 +7702,7 @@ var ipushpull;
         Auth.$inject = ["$q", "$http", "$httpParamSerializerJQLike", "ipushpull_conf"];
         return Auth;
     }(EventEmitter));
-    ipushpull.module.service("ippAuth", Auth);
+    ipushpull.module.service("ippAuthService", Auth);
 })(ipushpull || (ipushpull = {}));
 
 var ipushpull;
@@ -7785,7 +7785,7 @@ var ipushpull;
         PageWrap.$inject = ["$q", "$timeout", "ippApi", "ippAuth", "ippCrypto", "ipushpull_conf"];
         return PageWrap;
     }());
-    ipushpull.module.service("ippPage", PageWrap);
+    ipushpull.module.service("ippPageService", PageWrap);
     var Page = (function (_super) {
         __extends(Page, _super);
         function Page(pageId, folderId, autoStart) {
@@ -7797,10 +7797,10 @@ var ipushpull;
             this._supportsWS = true;
             this._passphrase = "";
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
-            this._folderId = (!isNaN(folderId)) ? folderId : undefined;
-            this._pageId = (!isNaN(pageId)) ? pageId : undefined;
-            this._folderName = (isNaN(folderId)) ? folderId : undefined;
-            this._pageName = (isNaN(pageId)) ? pageId : undefined;
+            this._folderId = (!isNaN(+folderId)) ? folderId : undefined;
+            this._pageId = (!isNaN(+pageId)) ? pageId : undefined;
+            this._folderName = (isNaN(+folderId)) ? folderId : undefined;
+            this._pageName = (isNaN(+pageId)) ? pageId : undefined;
             if (!this._pageId) {
                 autoStart = false;
             }
@@ -7892,7 +7892,7 @@ var ipushpull;
         };
         Page.prototype.destroy = function () {
             this._provider.destroy();
-            this.removeAllListeners();
+            this.removeEvent();
         };
         Page.prototype.init = function (autoStart) {
             if (autoStart === void 0) { autoStart = true; }
@@ -7978,6 +7978,10 @@ var ipushpull;
             this._stopped = true;
             clearTimeout(this._timer);
         };
+        ProviderREST.prototype.destroy = function () {
+            this.stop();
+            this.removeEvent();
+        };
         ProviderREST.prototype.startPolling = function () {
             var _this = this;
             this.load();
@@ -7997,7 +8001,7 @@ var ipushpull;
             api.getPage({
                 domainId: this._folderId,
                 pageId: this._pageId,
-                seq_no: (!ignoreSeqNo) ? this._seqNo : null
+                seq_no: (!ignoreSeqNo) ? this._seqNo : undefined,
             }).then(function (res) {
                 if (res.httpCode === 200 || res.httpCode === 204) {
                     if (res.httpCode === 200) {
@@ -8133,6 +8137,10 @@ var ipushpull;
         ProviderSocket.prototype.stop = function () {
             this._socket.disconnect();
             this._stopped = true;
+        };
+        ProviderSocket.prototype.destroy = function () {
+            this.stop();
+            this.removeEvent();
         };
         ProviderSocket.prototype.connect = function () {
             var query = [
