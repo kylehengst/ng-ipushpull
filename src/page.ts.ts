@@ -7,6 +7,7 @@
  * @todo alter page special page type for better manipulation later (reports 1000+)
  * @todo proper interfaces and constants
  * @todo parse all styles - convert from our model to cell-by-cell model
+ * @todo Socket should have proper implementation of start/stop mechanism
  */
 namespace ipushpull {
     "use strict";
@@ -127,12 +128,12 @@ namespace ipushpull {
     }
 
     // Main/public page service
-    let $q, $timeout, api, storage, crypto, config;
+    let $q, $timeout, api, auth, storage, crypto, config;
 
     class PageWrap {
-        public static $inject: string[] = ["$q", "$timeout", "ippApiService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
 
-        constructor(q, timeout, ippApi, ippStorage, ippCrypto, ippConf){
+        constructor(q, timeout, ippApi, ippAuth, ippStorage, ippCrypto, ippConf){
             // @todo This should not be here
             // @todo Handle last "/" in url
             let defaults: any = {
@@ -142,6 +143,7 @@ namespace ipushpull {
             $q = q;
             $timeout = timeout;
             api = ippApi;
+            auth = ippAuth;
             storage = ippStorage;
             crypto = ippCrypto;
             config = angular.merge({}, defaults, ippConf);
@@ -567,7 +569,7 @@ namespace ipushpull {
             return io.connect(`${config.url}/page/${this._pageId}`, {
                 query: query.join("&"),
                 transports: (this.supportsWebSockets()) ? ["websocket", "polling"] : ["polling"],
-                forceNew: true,
+                // forceNew: true,
             });
         }
 
@@ -589,7 +591,14 @@ namespace ipushpull {
 
         private onPageError = (data): void => {
             $timeout(() => {
-                this.emit("error", data);
+                if (data.code === 401){
+                    // @todo Try to silently re-login
+                    auth.refreshTokens().then(() => {
+                        this.start();
+                    });
+                } else {
+                    this.emit("error", data);
+                }
             });
         };
 

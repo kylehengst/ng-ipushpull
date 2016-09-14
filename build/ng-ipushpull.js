@@ -7357,13 +7357,25 @@ var ipushpull;
         return Request;
     }());
     var Api = (function () {
-        function Api($http, $httpParamSerializerJQLike, $q, auth, config) {
+        function Api($http, $httpParamSerializerJQLike, $q, $injector, storage, config) {
             var _this = this;
             this.$http = $http;
             this.$httpParamSerializerJQLike = $httpParamSerializerJQLike;
             this.$q = $q;
-            this.auth = auth;
+            this.$injector = $injector;
+            this.storage = storage;
             this.config = config;
+            this._locked = false;
+            this.dummyRequest = function (data) {
+                console.log("Api is locked down, preventing call " + data.url);
+                var q = _this.$q.defer();
+                q.reject({
+                    data: {},
+                    status: 666,
+                    statusText: "Api is locked",
+                });
+                return q.promise;
+            };
             this.handleSuccess = function (response) {
                 var q = _this.$q.defer();
                 q.resolve({
@@ -7376,8 +7388,15 @@ var ipushpull;
             };
             this.handleError = function (response) {
                 var q = _this.$q.defer();
-                if (parseInt(response.status, 10) === 401) {
-                    _this.auth.refreshTokens();
+                if (parseInt(response.status, 10) === 401 && !_this._locked && response.data.error !== "invalid_grant") {
+                    _this._locked = true;
+                    _this.storage.remove("access_token");
+                    var ippAuth = _this.$injector.get("ippAuthService");
+                    ippAuth.authenticate().finally(function () {
+                        console.log("Api is unlocked");
+                        _this._locked = false;
+                        q.resolve();
+                    });
                 }
                 q.reject({
                     success: false,
@@ -7388,8 +7407,31 @@ var ipushpull;
                 return q.promise;
             };
             this._endPoint = this.config.url + "/api/1.0/";
-            return;
         }
+        Api.prototype.parseError = function (err, def) {
+            var msg = def;
+            if (err.data) {
+                var keys = Object.keys(err.data);
+                if (keys.length) {
+                    if (angular.isArray(err.data[keys[0]])) {
+                        msg = err.data[keys[0]][0];
+                    }
+                    else if (typeof err.data[keys[0]] === "string") {
+                        msg = err.data[keys[0]];
+                    }
+                    else {
+                        msg = def;
+                    }
+                }
+                else {
+                    msg = def;
+                }
+            }
+            else {
+                msg = def;
+            }
+            return msg;
+        };
         Api.prototype.getSelfInfo = function () {
             return this
                 .send(Request.get(this._endPoint + "users/self/")
@@ -7593,10 +7635,11 @@ var ipushpull;
             return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
         };
         Api.prototype.send = function (request) {
+            var token = this.storage.get("access_token");
             request.headers({
-                "Authorization": "Bearer " + ((this.auth.token) ? this.auth.token : "null"),
+                "Authorization": "Bearer " + ((token) ? token : "null"),
             });
-            var provider = this.$http;
+            var provider = (this._locked && !request.OVERRIDE_LOCK) ? this.dummyRequest : this.$http;
             request.cache(false);
             var r = provider({
                 url: request.URL,
@@ -7608,7 +7651,7 @@ var ipushpull;
             });
             return r.then(this.handleSuccess, this.handleError);
         };
-        Api.$inject = ["$http", "$httpParamSerializerJQLike", "$q", "ippAuthService", "ipushpull_conf"];
+        Api.$inject = ["$http", "$httpParamSerializerJQLike", "$q", "$injector", "ippGlobalStorageService", "ipushpull_conf"];
         return Api;
     }());
     ipushpull.module.service("ippApiService", Api);
@@ -7624,44 +7667,52 @@ var ipushpull;
     "use strict";
     var Auth = (function (_super) {
         __extends(Auth, _super);
-        function Auth($q, $http, $httpParamSerializerJQLike, config) {
+        function Auth($q, ippApi, storage, config) {
             _super.call(this);
             this.$q = $q;
-            this.$http = $http;
-            this.$httpParamSerializerJQLike = $httpParamSerializerJQLike;
+            this.ippApi = ippApi;
+            this.storage = storage;
             this.config = config;
+            this._user = {};
         }
-        Object.defineProperty(Auth, "EVENT_LOGGED_IN", {
+        Object.defineProperty(Auth.prototype, "EVENT_LOGGED_IN", {
             get: function () { return "logged_in"; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Auth, "EVENT_RE_LOGGED_IN", {
+        Object.defineProperty(Auth.prototype, "EVENT_RE_LOGGED_IN", {
             get: function () { return "re_logged"; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Auth, "EVENT_LOGGED_OUT", {
+        Object.defineProperty(Auth.prototype, "EVENT_LOGGED_OUT", {
             get: function () { return "logged_out"; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Auth, "EVENT_ERROR", {
+        Object.defineProperty(Auth.prototype, "EVENT_ERROR", {
             get: function () { return "error"; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Auth.prototype, "token", {
-            get: function () { return this._accessToken; },
+        Object.defineProperty(Auth.prototype, "user", {
+            get: function () { return this._user; },
             enumerable: true,
             configurable: true
         });
         Auth.prototype.authenticate = function () {
+            var _this = this;
             var q = this.$q.defer();
-            if (this._accessToken) {
-                q.resolve();
+            if (this.storage.get("access_token")) {
+                this.getUserInfo().then(function () {
+                    _this.emit(_this.EVENT_LOGGED_IN);
+                    q.resolve();
+                }, function (err) {
+                    _this.emit(_this.EVENT_ERROR, err);
+                    q.reject(err);
+                });
             }
-            else if (this._refreshToken) {
+            else if (this.storage.get("refresh_token")) {
                 return this.refreshTokens();
             }
             else {
@@ -7672,30 +7723,20 @@ var ipushpull;
         Auth.prototype.refreshTokens = function () {
             var _this = this;
             var q = this.$q.defer();
-            if (!this._refreshToken) {
+            var refreshToken = this.storage.get("refresh_token");
+            if (!refreshToken) {
                 this.logout();
                 q.reject();
                 return q.promise;
             }
-            this.$http({
-                method: "POST",
-                data: this.$httpParamSerializerJQLike({
-                    grant_type: "refresh_token",
-                    client_id: this.config.api_key,
-                    client_secret: this.config.api_secret,
-                    refresh_token: this._refreshToken,
-                }),
-                url: this.config.url + "/api/1.0/oauth/token/",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-            }).then(function (res) {
-                _this._accessToken = res.data.access_token;
-                _this._refreshToken = res.data.refresh_token;
-                _this.emit(Auth.EVENT_RE_LOGGED_IN);
+            this.ippApi.refreshAccessTokens(refreshToken).then(function (res) {
+                _this.storage.create("access_token", res.data.access_token);
+                _this.storage.create("refresh_token", res.data.refresh_token);
+                _this.emit(_this.EVENT_RE_LOGGED_IN);
+                _this.emit(_this.EVENT_LOGGED_IN);
                 q.resolve();
             }, function (err) {
-                _this.emit(Auth.EVENT_ERROR, err);
+                _this.emit(_this.EVENT_ERROR, err);
                 q.reject(err);
             });
             return q.promise;
@@ -7703,36 +7744,62 @@ var ipushpull;
         Auth.prototype.login = function (username, password) {
             var _this = this;
             var q = this.$q.defer();
-            this.$http({
-                method: "POST",
-                data: this.$httpParamSerializerJQLike({
-                    grant_type: "password",
-                    client_id: this.config.api_key,
-                    client_secret: this.config.api_secret,
-                    username: username,
-                    password: password,
-                }),
-                url: this.config.url + "/api/1.0/oauth/token/",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
+            this.ippApi.userLogin({
+                grant_type: "password",
+                client_id: this.config.api_key,
+                client_secret: this.config.api_secret,
+                email: username,
+                password: password,
             }).then(function (res) {
-                _this._accessToken = res.data.access_token;
-                _this._refreshToken = res.data.refresh_token;
-                _this.emit(Auth.EVENT_LOGGED_IN);
-                q.resolve();
+                _this.storage.create("access_token", res.data.access_token);
+                _this.storage.create("refresh_token", res.data.refresh_token);
+                _this.getUserInfo().then(function () {
+                    _this.emit(_this.EVENT_LOGGED_IN);
+                    q.resolve();
+                }, function (err) {
+                    _this.emit(_this.EVENT_ERROR, err);
+                    q.reject(err);
+                });
             }, function (err) {
-                _this.emit(Auth.EVENT_ERROR, err);
+                err.message = "";
+                if (err.httpCode === 400 || err.httpCode === 401) {
+                    switch (err.data.error) {
+                        case "invalid_grant":
+                            err.message = "The username and password you entered did not match our records. Please double-check and try again.";
+                            break;
+                        case "invalid_client":
+                            err.message = "Your client doesn\'t have access to iPushPull system.";
+                            break;
+                        case "invalid_request":
+                            err.message = err.data.error_description;
+                            break;
+                        default:
+                            err.message = _this.ippApi.parseError(err.data, "Unknown error");
+                            break;
+                    }
+                }
+                _this.emit(_this.EVENT_ERROR, err);
                 q.reject(err);
             });
             return q.promise;
         };
         Auth.prototype.logout = function () {
-            this.emit(Auth.EVENT_LOGGED_OUT);
-            this._accessToken = undefined;
-            this._refreshToken = undefined;
+            this.emit(this.EVENT_LOGGED_OUT);
+            this.storage.remove("access_token");
+            this.storage.remove("refresh_token");
         };
-        Auth.$inject = ["$q", "$http", "$httpParamSerializerJQLike", "ipushpull_conf"];
+        Auth.prototype.getUserInfo = function () {
+            var _this = this;
+            var q = this.$q.defer();
+            this.ippApi.getSelfInfo().then(function (res) {
+                _this._user = res.data;
+                q.resolve();
+            }, function (err) {
+                q.reject(err);
+            });
+            return q.promise;
+        };
+        Auth.$inject = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
         return Auth;
     }(EventEmitter));
     ipushpull.module.service("ippAuthService", Auth);
@@ -7801,9 +7868,9 @@ var __extends = (this && this.__extends) || function (d, b) {
 var ipushpull;
 (function (ipushpull) {
     "use strict";
-    var $q, $timeout, api, auth, crypto, config;
+    var $q, $timeout, api, auth, storage, crypto, config;
     var PageWrap = (function () {
-        function PageWrap(q, timeout, ippApi, ippAuth, ippCrypto, ippConf) {
+        function PageWrap(q, timeout, ippApi, ippAuth, ippStorage, ippCrypto, ippConf) {
             var defaults = {
                 url: "https://www.ipushpull.com",
             };
@@ -7811,11 +7878,12 @@ var ipushpull;
             $timeout = timeout;
             api = ippApi;
             auth = ippAuth;
+            storage = ippStorage;
             crypto = ippCrypto;
             config = angular.merge({}, defaults, ippConf);
             return Page;
         }
-        PageWrap.$inject = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippCryptoService", "ipushpull_conf"];
+        PageWrap.$inject = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
         return PageWrap;
     }());
     ipushpull.module.service("ippPageService", PageWrap);
@@ -7849,57 +7917,57 @@ var ipushpull;
                 this.init(autoStart);
             }
         }
-        Object.defineProperty(Page, "TYPE_REGULAR", {
+        Object.defineProperty(Page.prototype, "TYPE_REGULAR", {
             get: function () { return 0; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "TYPE_ALERT", {
+        Object.defineProperty(Page.prototype, "TYPE_ALERT", {
             get: function () { return 5; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "TYPE_PDF", {
+        Object.defineProperty(Page.prototype, "TYPE_PDF", {
             get: function () { return 6; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "TYPE_PAGE_ACCESS_REPORT", {
+        Object.defineProperty(Page.prototype, "TYPE_PAGE_ACCESS_REPORT", {
             get: function () { return 1001; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "TYPE_DOMAIN_USAGE_REPORT", {
+        Object.defineProperty(Page.prototype, "TYPE_DOMAIN_USAGE_REPORT", {
             get: function () { return 1002; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "TYPE_GLOBAL_USAGE_REPORT", {
+        Object.defineProperty(Page.prototype, "TYPE_GLOBAL_USAGE_REPORT", {
             get: function () { return 1003; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "TYPE_PAGE_UPDATE_REPORT", {
+        Object.defineProperty(Page.prototype, "TYPE_PAGE_UPDATE_REPORT", {
             get: function () { return 1004; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "TYPE_LIVE_USAGE_REPORT", {
+        Object.defineProperty(Page.prototype, "TYPE_LIVE_USAGE_REPORT", {
             get: function () { return 1007; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "EVENT_NEW_CONTENT", {
+        Object.defineProperty(Page.prototype, "EVENT_NEW_CONTENT", {
             get: function () { return "new_content"; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "EVENT_NEW_META", {
+        Object.defineProperty(Page.prototype, "EVENT_NEW_META", {
             get: function () { return "new_meta"; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page, "EVENT_ERROR", {
+        Object.defineProperty(Page.prototype, "EVENT_ERROR", {
             get: function () { return "error"; },
             enumerable: true,
             configurable: true
@@ -7959,7 +8027,7 @@ var ipushpull;
                     }
                     else {
                         _this.decrypted = false;
-                        _this.emit(Page.EVENT_ERROR, "Decryption failed");
+                        _this.emit(_this.EVENT_ERROR, "Decryption failed");
                     }
                 }
                 else {
@@ -7967,17 +8035,17 @@ var ipushpull;
                 }
                 data.content = PageStyles.decompressStyles(data.content);
                 _this._data = angular.merge({}, _this._data, data);
-                _this.emit(Page.EVENT_NEW_CONTENT, data);
+                _this.emit(_this.EVENT_NEW_CONTENT, data);
             });
             this._provider.on("meta_update", function (data) {
                 data.special_page_type = _this.updatePageType(data.special_page_type);
                 delete data.content;
                 delete data.encrypted_content;
                 _this._data = angular.merge({}, _this._data, data);
-                _this.emit(Page.EVENT_NEW_META, data);
+                _this.emit(_this.EVENT_NEW_META, data);
             });
             this._provider.on("error", function (err) {
-                _this.emit(Page.EVENT_ERROR, err);
+                _this.emit(_this.EVENT_ERROR, err);
             });
         };
         Page.prototype.updatePageType = function (pageType) {
@@ -8106,16 +8174,19 @@ var ipushpull;
             };
             this.onPageError = function (data) {
                 $timeout(function () {
-                    _this.emit("error", data);
+                    if (data.code === 401) {
+                        auth.refreshTokens().then(function () {
+                            _this.start();
+                        });
+                    }
+                    else {
+                        _this.emit("error", data);
+                    }
                 });
             };
             this.onOAuthError = function (data) {
-                if (data.error === "expired_token") {
-                    auth.refreshTokens().then(function () {
-                        _this.start();
-                    });
-                }
             };
+            this.supportsWebSockets = function () { return "WebSocket" in window || "MozWebSocket" in window; };
             if (autoStart) {
                 this.start();
             }
@@ -8177,14 +8248,14 @@ var ipushpull;
         };
         ProviderSocket.prototype.connect = function () {
             var query = [
-                ("access_token=" + auth.token),
+                ("access_token=" + storage.get("access_token")),
             ];
             query = query.filter(function (val) {
                 return (val.length > 0);
             });
             return io.connect(config.url + "/page/" + this._pageId, {
                 query: query.join("&"),
-                forceNew: true,
+                transports: (this.supportsWebSockets()) ? ["websocket", "polling"] : ["polling"],
             });
         };
         return ProviderSocket;
@@ -8320,4 +8391,44 @@ var ipushpull;
         };
         return PageStyles;
     }());
+})(ipushpull || (ipushpull = {}));
+
+var ipushpull;
+(function (ipushpull) {
+    "use strict";
+    var LocalStorage = (function () {
+        function LocalStorage() {
+            this.prefix = "ipp";
+        }
+        LocalStorage.prototype.create = function (key, value) {
+            localStorage.setItem(this.makeKey(key), value);
+        };
+        LocalStorage.prototype.get = function (key, defaultValue) {
+            return localStorage.getItem(this.makeKey(key));
+        };
+        LocalStorage.prototype.remove = function (key) {
+            localStorage.removeItem(this.makeKey(key));
+        };
+        LocalStorage.prototype.makeKey = function (key) {
+            if (this.prefix && key.indexOf(this.prefix) !== 0) {
+                key = this.prefix + "_" + key;
+            }
+            if (this.suffix) {
+                key = key + "_" + this.suffix;
+            }
+            return key;
+        };
+        return LocalStorage;
+    }());
+    ipushpull.module.service("ippUserStorageService", ["ippAuthService", function (ippAuth) {
+            var storage = new LocalStorage();
+            storage.suffix = "GUEST";
+            ippAuth.on("logged_in", function () {
+                storage.suffix = "" + ippAuth.user.id;
+            });
+            return storage;
+        }]);
+    ipushpull.module.service("ippGlobalStorageService", [function () {
+            return new LocalStorage();
+        }]);
 })(ipushpull || (ipushpull = {}));

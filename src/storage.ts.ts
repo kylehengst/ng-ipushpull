@@ -179,6 +179,12 @@ namespace ipushpull {
         }
     }*/
 
+    export interface IStorageService {
+        create: (key: string, value: string) => void;
+        get: (key: string, defaultValue: any) => string;
+        remove: (key: string) => void;
+    }
+
     class LocalStorage {
         // public static $inject: string[] = [];
 

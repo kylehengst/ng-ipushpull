@@ -1,3 +1,13 @@
+/**
+ *
+ * @todo Add following to every request:
+ *
+ * $http.defaults.headers.common["x-requested-with"] = "XMLHttpRequest";
+ * $http.defaults.headers.common["x-ipp-device-uuid"] = $rootScope.uuid;
+ * $http.defaults.headers.common["x-ipp-client"] = $rootScope.ippCI;
+ * $http.defaults.headers.common["x-ipp-client-version"] = ipp.config.version;
+ */
+
 namespace ipushpull {
     "use strict";
 
@@ -107,6 +117,7 @@ namespace ipushpull {
     }
 
     export interface IApiService {
+        parseError: (err: any, def: string) => string;
         getSelfInfo: () => IPromise<IRequestResult>;
         refreshAccessTokens: (refreshToken: string) => IPromise<IRequestResult>;
         userLogin: (data: any) => IPromise<IRequestResult>;
@@ -171,6 +182,31 @@ namespace ipushpull {
 
         constructor(private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private $q: IQService, private $injector: IInjectorService, private storage, private config: IIPPConfig){
             this._endPoint = `${this.config.url}/api/1.0/`;
+        }
+
+        public parseError(err: any, def: string): string {
+            let msg: string = def;
+
+            if (err.data){
+                // @todo replace Object.keys with custom function because it is not supported in all browsers
+                let keys: string[] = Object.keys(err.data);
+                if (keys.length){
+                    if (angular.isArray(err.data[keys[0]])){
+                        msg = err.data[keys[0]][0];
+                    } else if (typeof err.data[keys[0]] === "string"){
+                        msg = err.data[keys[0]];
+                    } else {
+                        msg = def;
+                    }
+
+                } else {
+                    msg = def;
+                }
+            } else {
+                msg = def;
+            }
+
+            return msg;
         }
 
         public getSelfInfo(): IPromise<IRequestResult>{

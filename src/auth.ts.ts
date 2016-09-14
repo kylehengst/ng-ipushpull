@@ -22,6 +22,7 @@ namespace ipushpull {
 
         authenticate: () => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
+        logout: () => void;
         refreshTokens: () => IPromise<any>;
     }
 
@@ -68,7 +69,10 @@ namespace ipushpull {
                 this.getUserInfo().then(() => {
                     this.emit(this.EVENT_LOGGED_IN); // @todo Actually at this moment we have no idea if access token is valid
                     q.resolve();
-                }); // @todo Error?
+                }, (err) => {
+                    this.emit(this.EVENT_ERROR, err);
+                    q.reject(err);
+                });
             } else if (this.storage.get("refresh_token")) {
                 return this.refreshTokens();
             } else {
@@ -119,15 +123,34 @@ namespace ipushpull {
                 this.storage.create("access_token", res.data.access_token);
                 this.storage.create("refresh_token", res.data.refresh_token);
 
+                // @todo Code repetition from this.authenticate - just call that
                 this.getUserInfo().then(() => {
                     this.emit(this.EVENT_LOGGED_IN);
                     q.resolve();
                 }, (err) => {
                     this.emit(this.EVENT_ERROR, err);
                     q.reject(err);
-                }); // @todo error ?
+                });
 
             }, (err) => {
+                err.message = "";
+                if (err.httpCode === 400 || err.httpCode === 401) {
+                    switch (err.data.error) {
+                        case "invalid_grant":
+                            err.message = "The username and password you entered did not match our records. Please double-check and try again.";
+                            break;
+                        case "invalid_client":
+                            err.message = "Your client doesn\'t have access to iPushPull system.";
+                            break;
+                        case "invalid_request":
+                            err.message = err.data.error_description;
+                            break;
+                        default :
+                            err.message = this.ippApi.parseError(err.data, "Unknown error");
+                            break;
+                    }
+                }
+
                 this.emit(this.EVENT_ERROR, err);
                 q.reject(err);
             });
@@ -146,10 +169,9 @@ namespace ipushpull {
             let q: IDeferred<IUserSelf> = this.$q.defer();
 
             this.ippApi.getSelfInfo().then((res) => {
-                this._user = res.data;
+                this._user = res.data; // going outside function scope..
                 q.resolve();
             }, (err) => {
-                this.emit(this.EVENT_ERROR, err);
                 q.reject(err);
             });
 

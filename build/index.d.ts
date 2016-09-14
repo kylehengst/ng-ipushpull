@@ -7,6 +7,7 @@ declare namespace ipushpull {
         httpText: string;
     }
     interface IApiService {
+        parseError: (err: any, def: string) => string;
         getSelfInfo: () => IPromise<IRequestResult>;
         refreshAccessTokens: (refreshToken: string) => IPromise<IRequestResult>;
         userLogin: (data: any) => IPromise<IRequestResult>;
@@ -66,10 +67,34 @@ declare namespace ipushpull {
 
 declare namespace ipushpull {
     import IPromise = angular.IPromise;
-    interface IAuthService {
-        token: string;
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    interface IAuthService extends IEventEmitter {
+        EVENT_LOGGED_IN: string;
+        EVENT_RE_LOGGED_IN: string;
+        EVENT_LOGGED_OUT: string;
+        EVENT_ERROR: string;
+        user: IUserSelf;
+        authenticate: () => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
+        logout: () => void;
         refreshTokens: () => IPromise<any>;
+    }
+    interface IUserSelf {
+        id: number;
+        url: string;
+        email: string;
+        screen_name: string;
+        first_name: string;
+        last_name: string;
+        mobile_phone_number: string;
+        pushbullet_id: string;
+        default_domain_id: number;
+        default_page_id: number;
+        default_domain_name: string;
+        default_page_name: string;
+        pending_invitation_count: number;
+        can_create_folders: boolean;
+        meta_data: any[];
     }
 }
 
@@ -198,6 +223,17 @@ declare namespace ipushpull {
         freeze: boolean;
     }
     interface IPageService {
+        TYPE_REGULAR: number;
+        TYPE_ALERT: number;
+        TYPE_PDF: number;
+        TYPE_PAGE_ACCESS_REPORT: number;
+        TYPE_DOMAIN_USAGE_REPORT: number;
+        TYPE_GLOBAL_USAGE_REPORT: number;
+        TYPE_PAGE_UPDATE_REPORT: number;
+        TYPE_LIVE_USAGE_REPORT: number;
+        EVENT_NEW_CONTENT: string;
+        EVENT_NEW_META: string;
+        EVENT_ERROR: string;
         ready: boolean;
         decrypted: boolean;
         passphrase: string;
@@ -206,5 +242,13 @@ declare namespace ipushpull {
         stop: () => void;
         push: () => void;
         destroy: () => void;
+    }
+}
+
+declare namespace ipushpull {
+    interface IStorageService {
+        create: (key: string, value: string) => void;
+        get: (key: string, defaultValue: any) => string;
+        remove: (key: string) => void;
     }
 }

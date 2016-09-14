@@ -9,6 +9,7 @@ declare namespace ipushpull {
         user: IUserSelf;
         authenticate: () => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
+        logout: () => void;
         refreshTokens: () => IPromise<any>;
     }
     interface IUserSelf {
