@@ -101,6 +101,17 @@ declare namespace ipushpull {
         freeze: boolean;
     }
     interface IPageService {
+        TYPE_REGULAR: number;
+        TYPE_ALERT: number;
+        TYPE_PDF: number;
+        TYPE_PAGE_ACCESS_REPORT: number;
+        TYPE_DOMAIN_USAGE_REPORT: number;
+        TYPE_GLOBAL_USAGE_REPORT: number;
+        TYPE_PAGE_UPDATE_REPORT: number;
+        TYPE_LIVE_USAGE_REPORT: number;
+        EVENT_NEW_CONTENT: string;
+        EVENT_NEW_META: string;
+        EVENT_ERROR: string;
         ready: boolean;
         decrypted: boolean;
         passphrase: string;

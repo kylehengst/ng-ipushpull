@@ -13,6 +13,11 @@ namespace ipushpull {
     import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
 
     export interface IAuthService extends IEventEmitter {
+        EVENT_LOGGED_IN: string;
+        EVENT_RE_LOGGED_IN: string;
+        EVENT_LOGGED_OUT: string;
+        EVENT_ERROR: string;
+
         user: IUserSelf;
 
         authenticate: () => IPromise<any>;
@@ -41,10 +46,10 @@ namespace ipushpull {
     class Auth extends EventEmitter {
         public static $inject: string[] = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
 
-        public static get EVENT_LOGGED_IN(): string { return "logged_in"; }
-        public static get EVENT_RE_LOGGED_IN(): string { return "re_logged"; }
-        public static get EVENT_LOGGED_OUT(): string { return "logged_out"; }
-        public static get EVENT_ERROR(): string { return "error"; }
+        public get EVENT_LOGGED_IN(): string { return "logged_in"; }
+        public get EVENT_RE_LOGGED_IN(): string { return "re_logged"; }
+        public get EVENT_LOGGED_OUT(): string { return "logged_out"; }
+        public get EVENT_ERROR(): string { return "error"; }
 
         private _user: IUserSelf | any = {};
 
@@ -61,7 +66,7 @@ namespace ipushpull {
 
             if (this.storage.get("access_token")){
                 this.getUserInfo().then(() => {
-                    this.emit(Auth.EVENT_LOGGED_IN); // @todo Actually at this moment we have no idea if access token is valid
+                    this.emit(this.EVENT_LOGGED_IN); // @todo Actually at this moment we have no idea if access token is valid
                     q.resolve();
                 }); // @todo Error?
             } else if (this.storage.get("refresh_token")) {
@@ -88,12 +93,12 @@ namespace ipushpull {
                 this.storage.create("access_token", res.data.access_token);
                 this.storage.create("refresh_token", res.data.refresh_token);
 
-                this.emit(Auth.EVENT_RE_LOGGED_IN); // @todo do we need this?
-                this.emit(Auth.EVENT_LOGGED_IN);
+                this.emit(this.EVENT_RE_LOGGED_IN); // @todo do we need this?
+                this.emit(this.EVENT_LOGGED_IN);
 
                 q.resolve();
             }, (err) => {
-                this.emit(Auth.EVENT_ERROR, err);
+                this.emit(this.EVENT_ERROR, err);
                 q.reject(err);
             });
 
@@ -115,15 +120,15 @@ namespace ipushpull {
                 this.storage.create("refresh_token", res.data.refresh_token);
 
                 this.getUserInfo().then(() => {
-                    this.emit(Auth.EVENT_LOGGED_IN);
+                    this.emit(this.EVENT_LOGGED_IN);
                     q.resolve();
                 }, (err) => {
-                    this.emit(Auth.EVENT_ERROR, err);
+                    this.emit(this.EVENT_ERROR, err);
                     q.reject(err);
                 }); // @todo error ?
 
             }, (err) => {
-                this.emit(Auth.EVENT_ERROR, err);
+                this.emit(this.EVENT_ERROR, err);
                 q.reject(err);
             });
 
@@ -131,7 +136,7 @@ namespace ipushpull {
         }
 
         public logout(): void{
-            this.emit(Auth.EVENT_LOGGED_OUT);
+            this.emit(this.EVENT_LOGGED_OUT);
 
             this.storage.remove("access_token");
             this.storage.remove("refresh_token");
@@ -144,7 +149,7 @@ namespace ipushpull {
                 this._user = res.data;
                 q.resolve();
             }, (err) => {
-                this.emit(Auth.EVENT_ERROR, err);
+                this.emit(this.EVENT_ERROR, err);
                 q.reject(err);
             });
 

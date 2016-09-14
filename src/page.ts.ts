@@ -154,6 +154,19 @@ namespace ipushpull {
 
     // @todo extend event emitter interface
     export interface IPageService {
+        TYPE_REGULAR: number;
+        TYPE_ALERT: number;
+        TYPE_PDF: number;
+        TYPE_PAGE_ACCESS_REPORT: number;
+        TYPE_DOMAIN_USAGE_REPORT: number;
+        TYPE_GLOBAL_USAGE_REPORT: number;
+        TYPE_PAGE_UPDATE_REPORT: number;
+        TYPE_LIVE_USAGE_REPORT: number;
+
+        EVENT_NEW_CONTENT: string;
+        EVENT_NEW_META: string;
+        EVENT_ERROR: string;
+
         ready: boolean;
         decrypted: boolean;
 
@@ -167,18 +180,18 @@ namespace ipushpull {
     }
 
     class Page extends EventEmitter implements IPageService {
-        public static get TYPE_REGULAR(): number { return 0; }
-        public static get TYPE_ALERT(): number { return 5; }
-        public static get TYPE_PDF(): number { return 6; }
-        public static get TYPE_PAGE_ACCESS_REPORT(): number { return 1001; }
-        public static get TYPE_DOMAIN_USAGE_REPORT(): number { return 1002; }
-        public static get TYPE_GLOBAL_USAGE_REPORT(): number { return 1003; }
-        public static get TYPE_PAGE_UPDATE_REPORT(): number { return 1004; }
-        public static get TYPE_LIVE_USAGE_REPORT(): number { return 1007; }
+        public get TYPE_REGULAR(): number { return 0; }
+        public get TYPE_ALERT(): number { return 5; }
+        public get TYPE_PDF(): number { return 6; }
+        public get TYPE_PAGE_ACCESS_REPORT(): number { return 1001; }
+        public get TYPE_DOMAIN_USAGE_REPORT(): number { return 1002; }
+        public get TYPE_GLOBAL_USAGE_REPORT(): number { return 1003; }
+        public get TYPE_PAGE_UPDATE_REPORT(): number { return 1004; }
+        public get TYPE_LIVE_USAGE_REPORT(): number { return 1007; }
 
-        public static get EVENT_NEW_CONTENT(): string { return "new_content"; }
-        public static get EVENT_NEW_META(): string { return "new_meta"; }
-        public static get EVENT_ERROR(): string { return "error"; }
+        public get EVENT_NEW_CONTENT(): string { return "new_content"; }
+        public get EVENT_NEW_META(): string { return "new_meta"; }
+        public get EVENT_ERROR(): string { return "error"; }
 
         public ready: boolean = false;
         public decrypted: boolean = true;
@@ -294,7 +307,7 @@ namespace ipushpull {
                         data.content = decrypted;
                     } else {
                         this.decrypted = false;
-                        this.emit(Page.EVENT_ERROR, "Decryption failed");
+                        this.emit(this.EVENT_ERROR, "Decryption failed");
                     }
                 } else {
                     this.decrypted = true;
@@ -306,7 +319,7 @@ namespace ipushpull {
                 this._data = angular.merge({}, this._data, data);
 
                 // @todo This should be emitted before decryption probably
-                this.emit(Page.EVENT_NEW_CONTENT, data);
+                this.emit(this.EVENT_NEW_CONTENT, data);
             });
 
             this._provider.on("meta_update", (data) => {
@@ -318,11 +331,11 @@ namespace ipushpull {
 
                 this._data = angular.merge({}, this._data, data);
 
-                this.emit(Page.EVENT_NEW_META, data);
+                this.emit(this.EVENT_NEW_META, data);
             });
 
             this._provider.on("error", (err) => {
-                this.emit(Page.EVENT_ERROR, err);
+                this.emit(this.EVENT_ERROR, err);
             });
         }
 

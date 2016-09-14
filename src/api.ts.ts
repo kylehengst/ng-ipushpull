@@ -171,8 +171,6 @@ namespace ipushpull {
 
         constructor(private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private $q: IQService, private $injector: IInjectorService, private storage, private config: IIPPConfig){
             this._endPoint = `${this.config.url}/api/1.0/`;
-
-            return;
         }
 
         public getSelfInfo(): IPromise<IRequestResult>{
