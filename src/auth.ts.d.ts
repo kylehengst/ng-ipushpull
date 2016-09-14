@@ -1,6 +1,7 @@
 declare namespace ipushpull {
     import IPromise = angular.IPromise;
-    interface IAuthService {
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    interface IAuthService extends IEventEmitter {
         user: IUserSelf;
         authenticate: () => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;

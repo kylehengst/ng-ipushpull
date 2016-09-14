@@ -10,8 +10,9 @@ namespace ipushpull {
     import IQService = angular.IQService;
     import IPromise = angular.IPromise;
     import IDeferred = angular.IDeferred;
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
 
-    export interface IAuthService {
+    export interface IAuthService extends IEventEmitter {
         user: IUserSelf;
 
         authenticate: () => IPromise<any>;

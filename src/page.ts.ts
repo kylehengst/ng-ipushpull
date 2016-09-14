@@ -13,6 +13,7 @@ namespace ipushpull {
     import IDeferred = angular.IDeferred;
     import Socket = SocketIOClient.Socket;
     import IPromise = angular.IPromise;
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
 
     export interface IPageContentLink {
         external: boolean;
@@ -183,7 +184,7 @@ namespace ipushpull {
         public decrypted: boolean = true;
 
         private _supportsWS: boolean = true; // let's be optimistic by default
-        private _provider;
+        private _provider: IPageProvider;
 
         private _data: IPage;
         private _pageId: number;
@@ -194,17 +195,17 @@ namespace ipushpull {
         private _passphrase: string = "";
 
         // @todo Using type "any" for page and folder ids, because string | number throws compiler error http://stackoverflow.com/questions/39467714
-        constructor(pageId?: any, folderId?: any, autoStart: boolean = true){
+        constructor(pageId?: number | string, folderId?: number | string, autoStart: boolean = true){
             super();
 
             // Decide if client can use websockets
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
 
             // Process page and folder id/name
-            this._folderId = (!isNaN(+folderId)) ? folderId : undefined;
-            this._pageId = (!isNaN(+pageId)) ? pageId : undefined;
-            this._folderName = (isNaN(+folderId)) ? folderId : undefined;
-            this._pageName = (isNaN(+pageId)) ? pageId : undefined;
+            this._folderId = (!isNaN(+folderId)) ? <number>folderId : undefined;
+            this._pageId = (!isNaN(+pageId)) ? <number>pageId : undefined;
+            this._folderName = (isNaN(+folderId)) ? <string>folderId : undefined;
+            this._pageName = (isNaN(+pageId)) ? <string>pageId : undefined;
 
             // If we dont have page id, cannot start autopulling
             // @todo Should we emit some error to user?
@@ -273,7 +274,7 @@ namespace ipushpull {
             return q.promise;
         }
 
-        private registerListeners(){
+        private registerListeners(): void{
             // Setup listeners
             this._provider.on("content_update", (data) => {
                 // @todo should change only on initial load, so might move it somewhere else
@@ -362,7 +363,7 @@ namespace ipushpull {
     }
 
     // @todo extend event emitter interface
-    interface IPageProvider {
+    interface IPageProvider extends IEventEmitter {
         start: () => void;
         stop: () => void;
         destroy: () => void;
@@ -552,6 +553,7 @@ namespace ipushpull {
 
             return io.connect(`${config.url}/page/${this._pageId}`, {
                 query: query.join("&"),
+                transports: (this.supportsWebSockets()) ? ["websocket", "polling"] : ["polling"],
                 forceNew: true,
             });
         }
@@ -583,6 +585,8 @@ namespace ipushpull {
 
             // @todo should we watch auth service for re-logged and re-connect?
         };
+
+        private supportsWebSockets = () => { return "WebSocket" in window || "MozWebSocket" in window; };
     }
 
     class PageStyles {

@@ -523,7 +523,7 @@ namespace ipushpull {
                 // Make sure access token is gone
                 this.storage.remove("access_token");
 
-                let ippAuth: IAuthService = this.$injector.get("ippAuthService");
+                let ippAuth: IAuthService = this.$injector.get<IAuthService>("ippAuthService");
 
                 // Attempt to re-log in
                 ippAuth.authenticate().finally(() => {
