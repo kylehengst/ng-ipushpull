@@ -8409,7 +8409,13 @@ var ipushpull;
             localStorage.setItem(this.makeKey(key), value);
         };
         LocalStorage.prototype.get = function (key, defaultValue) {
-            return localStorage.getItem(this.makeKey(key));
+            var val = localStorage.getItem(this.makeKey(key));
+            if (this.isValidJSON(val)) {
+                return JSON.parse(val);
+            }
+            else {
+                return val;
+            }
         };
         LocalStorage.prototype.remove = function (key) {
             localStorage.removeItem(this.makeKey(key));
@@ -8422,6 +8428,15 @@ var ipushpull;
                 key = key + "_" + this.suffix;
             }
             return key;
+        };
+        LocalStorage.prototype.isValidJSON = function (string) {
+            try {
+                var json = JSON.parse(string);
+                return true;
+            }
+            catch (e) {
+                return false;
+            }
         };
         return LocalStorage;
     }());

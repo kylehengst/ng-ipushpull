@@ -1,7 +1,7 @@
 /**
  *
  * @todo Add expire field to cookie provider
- * @todo Provider names as constants
+ * @todo Somehow configurable prefix
  */
 
 namespace ipushpull {
@@ -181,7 +181,7 @@ namespace ipushpull {
 
     export interface IStorageService {
         create: (key: string, value: string) => void;
-        get: (key: string, defaultValue: any) => string;
+        get: (key: string, defaultValue: any) => any;
         remove: (key: string) => void;
     }
 
@@ -196,7 +196,13 @@ namespace ipushpull {
         }
 
         public get(key: string, defaultValue: any): string {
-            return localStorage.getItem(this.makeKey(key));
+            let val: any = localStorage.getItem(this.makeKey(key));
+
+            if (this.isValidJSON(val)){
+                return JSON.parse(val);
+            } else {
+                return val;
+            }
         }
 
         public remove(key: string): void {
@@ -213,6 +219,15 @@ namespace ipushpull {
             }
 
             return key;
+        }
+
+        private isValidJSON(string: any){
+            try{
+                let json = JSON.parse(string);
+                return true;
+            } catch(e){
+                return false;
+            }
         }
     }
 
