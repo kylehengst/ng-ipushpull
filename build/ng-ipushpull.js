@@ -7740,7 +7740,6 @@ var ipushpull;
                     _this.emit(_this.EVENT_ERROR, err);
                     q.reject(err);
                 });
-                q.resolve();
             }, function (err) {
                 _this.emit(_this.EVENT_ERROR, err);
                 q.reject(err);
