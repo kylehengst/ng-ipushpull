@@ -7732,8 +7732,14 @@ var ipushpull;
             this.ippApi.refreshAccessTokens(refreshToken).then(function (res) {
                 _this.storage.create("access_token", res.data.access_token);
                 _this.storage.create("refresh_token", res.data.refresh_token);
-                _this.emit(_this.EVENT_RE_LOGGED_IN);
-                _this.emit(_this.EVENT_LOGGED_IN);
+                _this.getUserInfo().then(function () {
+                    _this.emit(_this.EVENT_RE_LOGGED_IN);
+                    _this.emit(_this.EVENT_LOGGED_IN);
+                    q.resolve();
+                }, function (err) {
+                    _this.emit(_this.EVENT_ERROR, err);
+                    q.reject(err);
+                });
                 q.resolve();
             }, function (err) {
                 _this.emit(_this.EVENT_ERROR, err);
@@ -8255,7 +8261,7 @@ var ipushpull;
             });
             return io.connect(config.url + "/page/" + this._pageId, {
                 query: query.join("&"),
-                transports: (this.supportsWebSockets()) ? ["websocket", "polling"] : ["polling"],
+                transports: (this.supportsWebSockets()) ? ["websocket"] : ["polling"],
             });
         };
         return ProviderSocket;

@@ -97,8 +97,15 @@ namespace ipushpull {
                 this.storage.create("access_token", res.data.access_token);
                 this.storage.create("refresh_token", res.data.refresh_token);
 
-                this.emit(this.EVENT_RE_LOGGED_IN); // @todo do we need this?
-                this.emit(this.EVENT_LOGGED_IN);
+                // @todo Code repetition from this.authenticate - just call that
+                this.getUserInfo().then(() => {
+                    this.emit(this.EVENT_RE_LOGGED_IN); // @todo do we need this?
+                    this.emit(this.EVENT_LOGGED_IN);
+                    q.resolve();
+                }, (err) => {
+                    this.emit(this.EVENT_ERROR, err);
+                    q.reject(err);
+                });
 
                 q.resolve();
             }, (err) => {

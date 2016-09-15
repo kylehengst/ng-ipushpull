@@ -568,7 +568,7 @@ namespace ipushpull {
 
             return io.connect(`${config.url}/page/${this._pageId}`, {
                 query: query.join("&"),
-                transports: (this.supportsWebSockets()) ? ["websocket", "polling"] : ["polling"],
+                transports: (this.supportsWebSockets()) ? ["websocket"] : ["polling"],
                 // forceNew: true,
             });
         }
