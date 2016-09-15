@@ -106,8 +106,6 @@ namespace ipushpull {
                     this.emit(this.EVENT_ERROR, err);
                     q.reject(err);
                 });
-
-                q.resolve();
             }, (err) => {
                 this.emit(this.EVENT_ERROR, err);
                 q.reject(err);
