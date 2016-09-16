@@ -181,6 +181,7 @@ namespace ipushpull {
 
     export interface IStorageService {
         create: (key: string, value: string) => void;
+        save: (key: string, value: string) => void;
         get: (key: string, defaultValue: any) => any;
         remove: (key: string) => void;
     }
@@ -195,8 +196,17 @@ namespace ipushpull {
             localStorage.setItem(this.makeKey(key), value);
         }
 
+        // Alias
+        public save(key: string, value: string): void {
+            return this.create(key, value);
+        }
+
         public get(key: string, defaultValue: any): string {
             let val: any = localStorage.getItem(this.makeKey(key));
+
+            if (!val){
+                return defaultValue;
+            }
 
             if (this.isValidJSON(val)){
                 return JSON.parse(val);
@@ -221,11 +231,11 @@ namespace ipushpull {
             return key;
         }
 
-        private isValidJSON(string: any){
+        private isValidJSON(val: any){
             try{
-                let json = JSON.parse(string);
+                let json: any = JSON.parse(val);
                 return true;
-            } catch(e){
+            } catch (e){
                 return false;
             }
         }

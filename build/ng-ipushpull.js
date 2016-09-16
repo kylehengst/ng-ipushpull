@@ -8408,8 +8408,14 @@ var ipushpull;
         LocalStorage.prototype.create = function (key, value) {
             localStorage.setItem(this.makeKey(key), value);
         };
+        LocalStorage.prototype.save = function (key, value) {
+            return this.create(key, value);
+        };
         LocalStorage.prototype.get = function (key, defaultValue) {
             var val = localStorage.getItem(this.makeKey(key));
+            if (!val) {
+                return defaultValue;
+            }
             if (this.isValidJSON(val)) {
                 return JSON.parse(val);
             }
@@ -8429,9 +8435,9 @@ var ipushpull;
             }
             return key;
         };
-        LocalStorage.prototype.isValidJSON = function (string) {
+        LocalStorage.prototype.isValidJSON = function (val) {
             try {
-                var json = JSON.parse(string);
+                var json = JSON.parse(val);
                 return true;
             }
             catch (e) {
