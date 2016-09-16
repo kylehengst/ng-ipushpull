@@ -2,6 +2,7 @@
  * Todo list
  * ------------------------------
  * @todo Implement page access polling
+ * @todo Implement creating and cloning of pages
  * @todo Emit something to indicate initial load
  * @todo expose function to trigger decryption
  * @todo alter page special page type for better manipulation later (reports 1000+)
@@ -9,6 +10,7 @@
  * @todo parse all styles - convert from our model to cell-by-cell model
  * @todo Socket should have proper implementation of start/stop mechanism
  */
+
 namespace ipushpull {
     "use strict";
     import IDeferred = angular.IDeferred;
