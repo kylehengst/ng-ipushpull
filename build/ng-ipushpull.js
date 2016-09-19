@@ -7873,14 +7873,15 @@ var __extends = (this && this.__extends) || function (d, b) {
 var ipushpull;
 (function (ipushpull) {
     "use strict";
-    var $q, $timeout, api, auth, storage, crypto, config;
+    var $q, $timeout, $interval, api, auth, storage, crypto, config;
     var PageWrap = (function () {
-        function PageWrap(q, timeout, ippApi, ippAuth, ippStorage, ippCrypto, ippConf) {
+        function PageWrap(q, timeout, interval, ippApi, ippAuth, ippStorage, ippCrypto, ippConf) {
             var defaults = {
                 url: "https://www.ipushpull.com",
             };
             $q = q;
             $timeout = timeout;
+            $interval = interval;
             api = ippApi;
             auth = ippAuth;
             storage = ippStorage;
@@ -7888,7 +7889,7 @@ var ipushpull;
             config = angular.merge({}, defaults, ippConf);
             return Page;
         }
-        PageWrap.$inject = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
+        PageWrap.$inject = ["$q", "$timeout", "$interval", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
         return PageWrap;
     }());
     ipushpull.module.service("ippPageService", PageWrap);
@@ -7972,8 +7973,18 @@ var ipushpull;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Page.prototype, "EVENT_ACCESS_UPDATED", {
+            get: function () { return "access_updated"; },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Page.prototype, "EVENT_ERROR", {
             get: function () { return "error"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page.prototype, "passphrase", {
+            set: function (passphrase) { this._passphrase = passphrase; },
             enumerable: true,
             configurable: true
         });
@@ -7982,8 +7993,8 @@ var ipushpull;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Page.prototype, "passphrase", {
-            set: function (passphrase) { this._passphrase = passphrase; },
+        Object.defineProperty(Page.prototype, "access", {
+            get: function () { return this._access; },
             enumerable: true,
             configurable: true
         });
@@ -7998,13 +8009,19 @@ var ipushpull;
         };
         Page.prototype.destroy = function () {
             this._provider.destroy();
+            $interval.cancel(this._accessInterval);
             this.removeEvent();
         };
         Page.prototype.init = function (autoStart) {
+            var _this = this;
             if (autoStart === void 0) { autoStart = true; }
             this._provider = (!this._supportsWS || config.transport === "polling")
                 ? new ProviderREST(this._pageId, this._folderId, autoStart)
                 : new ProviderSocket(this._pageId, this._folderId, autoStart);
+            this.getPageAccess();
+            this._accessInterval = $interval(function () {
+                _this.getPageAccess();
+            }, 30000);
             this.registerListeners();
         };
         Page.prototype.getPageId = function (folderName, pageName) {
@@ -8013,6 +8030,21 @@ var ipushpull;
                 q.resolve({ pageId: res.data.id, folderId: res.data.domain_id });
             }, function (err) {
                 q.reject(err);
+            });
+            return q.promise;
+        };
+        Page.prototype.getPageAccess = function () {
+            var _this = this;
+            var q = $q.defer();
+            api.getPageAccess({
+                domainId: this._folderId,
+                pageId: this._pageId,
+            }).then(function (res) {
+                _this._access = res.data;
+                _this.emit(_this.EVENT_ACCESS_UPDATED);
+                q.resolve();
+            }, function (err) {
+                q.reject();
             });
             return q.promise;
         };
@@ -8082,7 +8114,7 @@ var ipushpull;
         };
         ProviderREST.prototype.stop = function () {
             this._stopped = true;
-            clearTimeout(this._timer);
+            $timeout.cancel(this._timer);
         };
         ProviderREST.prototype.destroy = function () {
             this.stop();
@@ -8091,7 +8123,7 @@ var ipushpull;
         ProviderREST.prototype.startPolling = function () {
             var _this = this;
             this.load();
-            setTimeout(function () {
+            this._timer = $timeout(function () {
                 _this.startPolling();
             }, this._timeout);
         };
@@ -8323,6 +8355,10 @@ var ipushpull;
             }
             return content;
         };
+        PageStyles.prototype.reset = function () {
+            this.currentStyle = {};
+            this.currentBorders = { top: {}, right: {}, bottom: {}, left: {} };
+        };
         PageStyles.prototype.makeStyle = function (cellStyle) {
             var styleName, style = angular.copy(cellStyle);
             for (var item in style) {
@@ -8367,10 +8403,6 @@ var ipushpull;
             }
             return resultStyles;
         };
-        PageStyles.prototype.reset = function () {
-            this.currentStyle = {};
-            this.currentBorders = { top: {}, right: {}, bottom: {}, left: {} };
-        };
         PageStyles.prototype.excelToCSS = function (val) {
             return (this.excelStyles[val]) ? this.excelStyles[val] : val;
         };
@@ -8412,6 +8444,7 @@ var ipushpull;
             return this.create(key, value);
         };
         LocalStorage.prototype.get = function (key, defaultValue) {
+            if (defaultValue === void 0) { defaultValue = null; }
             var val = localStorage.getItem(this.makeKey(key));
             if (!val) {
                 return defaultValue;

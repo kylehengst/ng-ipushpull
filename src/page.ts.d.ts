@@ -1,4 +1,5 @@
 declare namespace ipushpull {
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
     interface IPageContentLink {
         external: boolean;
         address: string;
@@ -100,7 +101,59 @@ declare namespace ipushpull {
         rights: IPageRangeRights;
         freeze: boolean;
     }
-    interface IPageService {
+    interface IUserPageDomainCurrentUserAccess {
+        default_page_id: number;
+        default_page_url: string;
+        domain_id: number;
+        domain_url: string;
+        is_active: boolean;
+        is_administrator: boolean;
+        is_default_domain: boolean;
+        is_pending: boolean;
+        page_count: number;
+        user_id: number;
+        user_url: string;
+    }
+    interface IUserPageDomainAccess {
+        alerts_enabled: boolean;
+        by_name_url: string;
+        current_user_domain_access: IUserPageDomainCurrentUserAccess;
+        description: string;
+        display_name: string;
+        domain_type: number;
+        encryption_enabled: boolean;
+        id: number;
+        is_page_access_mode_selectable: boolean;
+        is_paying_customer: boolean;
+        login_screen_background_color: "";
+        logo_url: string;
+        name: string;
+        page_access_mode: number;
+        page_access_url: string;
+        url: string;
+    }
+    interface IUserPageAccess {
+        by_name_url: string;
+        content_by_name_url: string;
+        content_url: string;
+        domain: IUserPageDomainAccess;
+        domain_id: number;
+        domain_name: string;
+        domain_url: string;
+        encryption_to_use: number;
+        encryption_key_to_use: string;
+        id: number;
+        is_administrator: boolean;
+        is_public: boolean;
+        is_users_default_page: boolean;
+        name: string;
+        pull_interval: number;
+        push_interval: number;
+        special_page_type: number;
+        url: string;
+        write_access: boolean;
+    }
+    interface IPageService extends IEventEmitter {
         TYPE_REGULAR: number;
         TYPE_ALERT: number;
         TYPE_PDF: number;
@@ -115,7 +168,8 @@ declare namespace ipushpull {
         ready: boolean;
         decrypted: boolean;
         passphrase: string;
-        data: any;
+        data: IPage;
+        access: IUserPageAccess;
         start: () => void;
         stop: () => void;
         push: () => void;

@@ -1,7 +1,6 @@
 /**
  * Todo list
  * ------------------------------
- * @todo Implement page access polling
  * @todo Implement creating and cloning of pages
  * @todo Emit something to indicate initial load
  * @todo expose function to trigger decryption
@@ -17,6 +16,9 @@ namespace ipushpull {
     import Socket = SocketIOClient.Socket;
     import IPromise = angular.IPromise;
     import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    import IQService = angular.IQService;
+    import ITimeoutService = angular.ITimeoutService;
+    import IIntervalService = angular.IIntervalService;
 
     export interface IPageContentLink {
         external: boolean;
@@ -129,13 +131,79 @@ namespace ipushpull {
         freeze: boolean;
     }
 
+    // @todo This should be in some domain/folder service
+    export interface IUserPageDomainCurrentUserAccess {
+        default_page_id: number;
+        default_page_url: string;
+        domain_id: number;
+        domain_url: string;
+        is_active: boolean;
+        is_administrator: boolean;
+        is_default_domain: boolean;
+        is_pending: boolean;
+        page_count: number;
+        user_id: number;
+        user_url: string;
+    }
+
+    // @todo This should be probably in some domain/folder service
+    export interface IUserPageDomainAccess {
+        alerts_enabled: boolean;
+        by_name_url: string;
+        current_user_domain_access: IUserPageDomainCurrentUserAccess;
+        description: string;
+        display_name: string;
+        domain_type: number;
+        encryption_enabled: boolean;
+        id: number;
+        is_page_access_mode_selectable: boolean;
+        is_paying_customer: boolean;
+        login_screen_background_color: "";
+        logo_url: string;
+        name: string;
+        page_access_mode: number;
+        page_access_url: string;
+        url: string;
+    }
+
+    export interface IUserPageAccess {
+        by_name_url: string;
+        content_by_name_url: string;
+        content_url: string;
+        domain: IUserPageDomainAccess;
+        domain_id: number;
+        domain_name: string;
+        domain_url: string;
+        encryption_to_use: number;
+        encryption_key_to_use: string;
+        id: number;
+        is_administrator: boolean;
+        is_public: boolean;
+        is_users_default_page: boolean;
+        name: string;
+        pull_interval: number;
+        push_interval: number;
+        special_page_type: number;
+        url: string;
+        write_access: boolean;
+    }
+
     // Main/public page service
-    let $q, $timeout, api, auth, storage, crypto, config;
+    let $q: IQService, $timeout: ITimeoutService, $interval: IIntervalService, api: IApiService, auth: IAuthService, storage: IStorageService, crypto: ICryptoService, config: IIPPConfig;
 
     class PageWrap {
-        public static $inject: string[] = ["$q", "$timeout", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "$timeout", "$interval", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
 
-        constructor(q, timeout, ippApi, ippAuth, ippStorage, ippCrypto, ippConf){
+        constructor(
+            q: IQService,
+            timeout: ITimeoutService,
+            interval: IIntervalService,
+            ippApi: IApiService,
+            ippAuth: IAuthService,
+            ippStorage: IStorageService,
+            ippCrypto: ICryptoService,
+            ippConf: IIPPConfig){
+
             // @todo This should not be here
             // @todo Handle last "/" in url
             let defaults: any = {
@@ -144,6 +212,7 @@ namespace ipushpull {
 
             $q = q;
             $timeout = timeout;
+            $interval = interval;
             api = ippApi;
             auth = ippAuth;
             storage = ippStorage;
@@ -157,7 +226,7 @@ namespace ipushpull {
     ipushpull.module.service("ippPageService", PageWrap);
 
     // @todo extend event emitter interface
-    export interface IPageService {
+    export interface IPageService extends IEventEmitter {
         TYPE_REGULAR: number;
         TYPE_ALERT: number;
         TYPE_PDF: number;
@@ -175,7 +244,9 @@ namespace ipushpull {
         decrypted: boolean;
 
         passphrase: string;
-        data;
+
+        data: IPage;
+        access: IUserPageAccess;
 
         start: () => void;
         stop: () => void;
@@ -195,6 +266,7 @@ namespace ipushpull {
 
         public get EVENT_NEW_CONTENT(): string { return "new_content"; }
         public get EVENT_NEW_META(): string { return "new_meta"; }
+        public get EVENT_ACCESS_UPDATED(): string { return "access_updated"; }
         public get EVENT_ERROR(): string { return "error"; }
 
         public ready: boolean = false;
@@ -203,7 +275,11 @@ namespace ipushpull {
         private _supportsWS: boolean = true; // let's be optimistic by default
         private _provider: IPageProvider;
 
+        private _accessInterval: IPromise<any>;
+
         private _data: IPage;
+        private _access: IUserPageAccess;
+
         private _pageId: number;
         private _folderId: number;
         private _pageName: string;
@@ -232,23 +308,23 @@ namespace ipushpull {
 
             // @todo If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
             if (!this._pageId) {
-                this.getPageId(this._folderName, this._pageName).then(
-                    (res) => {
-                        this._pageId = res.pageId;
-                        this._folderId = res.folderId;
+                this.getPageId(this._folderName, this._pageName).then((res: any) => {
+                    this._pageId = res.pageId;
+                    this._folderId = res.folderId;
 
-                        this.init(autoStart);
-                    }, (err) => {
+                    this.init(autoStart);
+                }, (err) => {
                         // @todo Handle error
-                    }
-                );
+                });
             } else {
                 this.init(autoStart);
             }
         }
 
-        public get data(): IPage{ return this._data; }
         public set passphrase(passphrase: string){ this._passphrase = passphrase; }
+
+        public get data(): IPage{ return this._data; }
+        public get access(): IUserPageAccess {return this._access; }
 
         public start(): void{
             this._provider.start();
@@ -264,6 +340,7 @@ namespace ipushpull {
 
         public destroy(): void {
             this._provider.destroy();
+            $interval.cancel(this._accessInterval);
             this.removeEvent();
         }
 
@@ -273,11 +350,17 @@ namespace ipushpull {
                 ? new ProviderREST(this._pageId, this._folderId, autoStart)
                 : new ProviderSocket(this._pageId, this._folderId, autoStart);
 
+            // Start pulling page access
+            this.getPageAccess();
+            this._accessInterval = $interval(() => {
+                this.getPageAccess();
+            }, 30000);
+
             this.registerListeners();
         }
 
-        private getPageId(folderName: string, pageName: string) {
-            let q = $q.defer();
+        private getPageId(folderName: string, pageName: string): IPromise<any> {
+            let q: IDeferred<any> = $q.defer();
 
             // @todo Need specific/lightweight endpoint - before arguing my way through this, I can use page detail (or write my own)
 
@@ -286,6 +369,26 @@ namespace ipushpull {
             }, (err) => {
                 // Convert it into socket error
                 q.reject(err);
+            });
+
+            return q.promise;
+        }
+
+        private getPageAccess(): IPromise<any>{
+            let q: IDeferred<any> = $q.defer();
+
+            api.getPageAccess({
+                domainId: this._folderId,
+                pageId: this._pageId,
+            }).then((res: any) => {
+                this._access = res.data;
+
+                this.emit(this.EVENT_ACCESS_UPDATED);
+                q.resolve();
+            }, (err) => {
+                // @todo Should we emit something?
+                // @toodo Handle error?
+                q.reject();
             });
 
             return q.promise;
@@ -379,7 +482,6 @@ namespace ipushpull {
         }*/
     }
 
-    // @todo extend event emitter interface
     interface IPageProvider extends IEventEmitter {
         start: () => void;
         stop: () => void;
@@ -390,7 +492,7 @@ namespace ipushpull {
     class ProviderREST extends EventEmitter implements IPageProvider {
         private _stopped: boolean = false;
         private _requestOngoing: boolean = false;
-        private _timer: any;
+        private _timer: IPromise<any>;
         private _timeout: number = 1000;
 
         private _seqNo: number = 0;
@@ -410,7 +512,7 @@ namespace ipushpull {
 
         public stop(): void {
             this._stopped = true;
-            clearTimeout(this._timer);
+            $timeout.cancel(this._timer);
         }
 
         public destroy(): void {
@@ -418,10 +520,11 @@ namespace ipushpull {
             this.removeEvent();
         }
 
+        // @todo Not great
         private startPolling(): void {
             this.load();
 
-            setTimeout(() => {
+            this._timer = $timeout(() => {
                 this.startPolling();
             }, this._timeout);
         }
@@ -475,7 +578,7 @@ namespace ipushpull {
          * @param data
          * @returns {{id: number, seq_no: number, content_modified_timestamp: Date, content: any, content_modified_by: any, push_interval: number, pull_interval: number, is_public: boolean, description: string, encrypted_content: string, encryption_key_used: number, encryption_type_used: number, special_page_type: number}}
          */
-        private tempGetContentOb(data): any {
+        private tempGetContentOb(data: IPage): any {
             return {
                 id: data.id,
                 domain_id: data.domain_id,
@@ -500,7 +603,7 @@ namespace ipushpull {
          * @param data
          * @returns {any}
          */
-        private tempGetSettingsOb(data): any {
+        private tempGetSettingsOb(data: IPage): any {
             return JSON.parse(JSON.stringify(data));
         }
     }
@@ -516,7 +619,7 @@ namespace ipushpull {
         public static get SOCKET_EVENT_PAGE_USER_LEFT(): string { return "page_user_left"; }
 
         private _stopped: boolean = false;
-        private _socket;
+        private _socket: Socket;
 
         constructor(private _pageId?: number, private _folderId?: number, autoStart: boolean = true){
             super();
@@ -579,19 +682,19 @@ namespace ipushpull {
             return;
         };
 
-        private onPageContent = (data): void => {
+        private onPageContent = (data: IPageServiceContent): void => {
             $timeout(() => {
                 this.emit("content_update", data);
             });
         };
 
-        private onPageSettings = (data): void => {
+        private onPageSettings = (data: IPageServiceMeta): void => {
             $timeout(() => {
                 this.emit("meta_update", data);
             });
         };
 
-        private onPageError = (data): void => {
+        private onPageError = (data: any): void => {
             $timeout(() => {
                 if (data.code === 401){
                     // @todo Try to silently re-login
@@ -604,16 +707,23 @@ namespace ipushpull {
             });
         };
 
-        private onOAuthError = (data): void => {
+        private onOAuthError = (data: any): void => {
             // @todo Do something
 
             // @todo should we watch auth service for re-logged and re-connect?
+
+            // @todo Emit page error ?
         };
 
         private supportsWebSockets = () => { return "WebSocket" in window || "MozWebSocket" in window; };
     }
 
-    class PageStyles {
+    interface IPageStyler {
+        makeStyle: (cellStyle: IPageCellStyle) => IPageCellStyle;
+        reset: () => void;
+    }
+
+    class PageStyles implements IPageStyler {
         private currentStyle: IPageCellStyle = {};
         private currentBorders: any = {top: {}, right: {}, bottom: {}, left: {}};
 
@@ -667,7 +777,7 @@ namespace ipushpull {
          * Map excel border weights to css border weights (with some compromise)
          * @type {{thin: string, medium: string, thick: string, hair: string, hairline: string, double: string}}
          */
-        private excelBorderWeights = {
+        private excelBorderWeights: any = {
             "thin": "1px",
             "medium": "1px",
             "thick": "2px",
@@ -685,7 +795,7 @@ namespace ipushpull {
         ];
 
         public static decompressStyles(content: IPageContent): IPageContent {
-            let styler = new PageStyles();
+            let styler: IPageStyler = new PageStyles();
 
             for (let i: number = 0; i < content.length; i++){
                 for (let j: number = 0; j < content[i].length; j++) {
@@ -694,6 +804,11 @@ namespace ipushpull {
             }
 
             return content;
+        }
+
+        public reset(): void{
+            this.currentStyle = {};
+            this.currentBorders = {top: {}, right: {}, bottom: {}, left: {}};
         }
 
         /**
@@ -766,11 +881,6 @@ namespace ipushpull {
 
 
             return resultStyles;
-        }
-
-        public reset(): void{
-            this.currentStyle = {};
-            this.currentBorders = {top: {}, right: {}, bottom: {}, left: {}};
         }
 
         /**
