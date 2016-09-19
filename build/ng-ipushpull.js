@@ -7995,7 +7995,11 @@ var ipushpull;
             if (template) {
                 var page_1 = new Page(template.id, template.domain_id);
                 page_1.on(page_1.EVENT_READY, function () {
-                    page_1.clone(folderId, name).then(q.resolve, q.reject);
+                    page_1.clone(folderId, name)
+                        .then(q.resolve, q.reject)
+                        .finally(function () {
+                        page_1.destroy();
+                    });
                 });
             }
             else {
@@ -8041,8 +8045,14 @@ var ipushpull;
             this._provider.stop();
             this.updatesOn = false;
         };
-        Page.prototype.push = function () {
-            return;
+        Page.prototype.push = function (data, delta, encryptionKey) {
+            if (delta === void 0) { delta = true; }
+            if (delta) {
+                return this.pushDelta(data);
+            }
+            else {
+                return this.pushFull(data, encryptionKey);
+            }
         };
         Page.prototype.destroy = function () {
             this._provider.destroy();
@@ -8050,6 +8060,7 @@ var ipushpull;
             this.removeEvent();
         };
         Page.prototype.clone = function (folderId, name, options) {
+            var _this = this;
             if (options === void 0) { options = {}; }
             var q = $q.defer();
             if (!this.ready) {
@@ -8059,8 +8070,12 @@ var ipushpull;
             if (options.clone_ranges && this._folderId !== folderId) {
                 options.clone_ranges = false;
             }
-            Page.create(this._folderId, name, this.data.special_page_type).then(function (newPage) {
-                q.resolve(newPage);
+            Page.create(this._folderId, name, this._data.special_page_type).then(function (newPage) {
+                $q.all([
+                    newPage.push(_this._data.content, false),
+                ]).then(function (res) {
+                    q.resolve(newPage);
+                }, q.reject);
             }, function (err) {
                 q.reject(err);
             });
@@ -8105,10 +8120,6 @@ var ipushpull;
         Page.prototype.registerListeners = function () {
             var _this = this;
             this._provider.on("content_update", function (data) {
-                if (!_this.ready) {
-                    _this.emit(_this.EVENT_READY);
-                }
-                _this.ready = true;
                 data.special_page_type = _this.updatePageType(data.special_page_type);
                 if (data.encryption_type_used) {
                     var decrypted = crypto.decryptContent({
@@ -8129,6 +8140,10 @@ var ipushpull;
                 }
                 data.content = PageStyles.decompressStyles(data.content);
                 _this._data = angular.merge({}, _this._data, data);
+                if (!_this.ready) {
+                    _this.ready = true;
+                    _this.emit(_this.EVENT_READY);
+                }
                 _this.emit(_this.EVENT_NEW_CONTENT, data);
             });
             this._provider.on("meta_update", function (data) {
@@ -8142,11 +8157,65 @@ var ipushpull;
                 _this.emit(_this.EVENT_ERROR, err);
             });
         };
+        Page.prototype.pushFull = function (content, encryptionKey) {
+            var _this = this;
+            var q = $q.defer();
+            if (this._data.encryption_type_to_use) {
+                if (!encryptionKey) {
+                    q.reject("Need encryption key");
+                    return q.promise;
+                }
+                var encrypted = this.encrypt(encryptionKey, content);
+                if (encrypted) {
+                    this._data.encrypted_content = encrypted;
+                    this._data.encryption_type_used = 1;
+                    this._data.encryption_key_used = encryptionKey.name;
+                }
+                else {
+                    q.reject("Encryption failed");
+                    return q.promise;
+                }
+            }
+            else {
+                this._data.encryption_key_used = "";
+                this._data.encryption_type_used = 0;
+                this._data.content = content;
+            }
+            var data = {
+                content: this._data.content,
+                encrypted_content: this._data.encrypted_content,
+                encryption_type_used: this._data.encryption_type_used,
+                encryption_key_used: this._data.encryption_key_used,
+            };
+            var requestData = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: data,
+            };
+            api.savePageContent(requestData).then(function (res) {
+                _this._data.seq_no = res.data.seq_no;
+                q.resolve(res);
+            }, q.reject);
+            return q.promise;
+        };
+        Page.prototype.pushDelta = function (data) {
+            var q = $q.defer();
+            var requestData = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: data,
+            };
+            api.savePageContentDelta(requestData).then(q.resolve, q.reject);
+            return q.promise;
+        };
         Page.prototype.updatePageType = function (pageType) {
             if (pageType > 0 && pageType < 5 || pageType === 7) {
                 pageType += 1000;
             }
             return pageType;
+        };
+        Page.prototype.encrypt = function (key, content) {
+            return crypto.encryptContent(key, content);
         };
         return Page;
     }(EventEmitter));

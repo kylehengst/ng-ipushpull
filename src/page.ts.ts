@@ -99,8 +99,8 @@ namespace ipushpull {
         domain_url: string;
         encrypted_content: string;
         encryption_key_to_use: string;
-        encryption_key_used: number;
-        encryption_type_to_use: string;
+        encryption_key_used: string;
+        encryption_type_to_use: number;
         encryption_type_used: number;
         is_obscured_public: boolean;
         is_public: boolean;
@@ -113,6 +113,22 @@ namespace ipushpull {
         seq_no: number;
         show_gridlines: boolean;
         special_page_type: number;
+    }
+
+    export interface IPageDeltaContentCol {
+        col_index: number;
+        cell_content: IPageContentCell;
+    }
+
+    export interface IPageDeltaContentRow {
+        row_index: number;
+        cols: IPageDeltaContentCol[];
+    }
+
+    export interface IPageDelta {
+        new_rows: number[];
+        new_cols: number[];
+        content_delta: IPageDeltaContentRow[];
     }
 
     export interface IPage extends IPageServiceMeta {
@@ -270,7 +286,7 @@ namespace ipushpull {
 
         start: () => void;
         stop: () => void;
-        push: () => void;
+        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
         destroy: () => void;
         clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
     }
@@ -318,7 +334,11 @@ namespace ipushpull {
                 let page: IPageService = new Page(template.id, template.domain_id);
                 // @todo this business with autostart and receiving data etc is quite fiddly to say the least
                 page.on(page.EVENT_READY, () => {
-                    page.clone(folderId, name).then(q.resolve, q.reject);
+                    page.clone(folderId, name)
+                        .then(q.resolve, q.reject)
+                        .finally(() => {
+                            page.destroy();
+                        });
                 });
             } else {
                 api.createPage({
@@ -394,8 +414,12 @@ namespace ipushpull {
             this.updatesOn = false;
         }
 
-        public push(): void{
-            return;
+        public push(data: IPageContent|IPageDelta, delta: boolean = true, encryptionKey?: IEncryptionKey): IPromise<any> {
+            if (delta){
+                return this.pushDelta(<IPageDelta>data);
+            } else {
+                return this.pushFull(<IPageContent>data, encryptionKey);
+            }
         }
 
         public destroy(): void {
@@ -418,13 +442,14 @@ namespace ipushpull {
                 options.clone_ranges = false;
             }
 
-            // First create new page
-            Page.create(this._folderId, name, this.data.special_page_type).then((newPage: IPageService) => {
-                // @todo Copy settings
-
-                // @todo Copy content
-
-                q.resolve(newPage);
+            // Create new page
+            Page.create(this._folderId, name, this._data.special_page_type).then((newPage: IPageService) => {
+                $q.all([
+                    // @todo Save settings
+                    newPage.push(this._data.content, false), // Push content
+                ]).then((res) => {
+                    q.resolve(newPage);
+                }, q.reject); // @todo Handle properly
             }, (err) => {
                 q.reject(err);
             });
@@ -485,12 +510,6 @@ namespace ipushpull {
         private registerListeners(): void{
             // Setup listeners
             this._provider.on("content_update", (data) => {
-                // @todo should change only on initial load, so might move it somewhere else
-                if (!this.ready){
-                    this.emit(this.EVENT_READY);
-                }
-                this.ready = true;
-
                 data.special_page_type = this.updatePageType(data.special_page_type);
 
                 // Check for encryption and decrypt
@@ -516,6 +535,12 @@ namespace ipushpull {
 
                 this._data = angular.merge({}, this._data, data);
 
+                // @todo Not a great logic - When do we consider for a page to actually be ready?
+                if (!this.ready){
+                    this.ready = true;
+                    this.emit(this.EVENT_READY);
+                }
+
                 // @todo This should be emitted before decryption probably
                 this.emit(this.EVENT_NEW_CONTENT, data);
             });
@@ -537,6 +562,70 @@ namespace ipushpull {
             });
         }
 
+        private pushFull(content: IPageContent, encryptionKey?: IEncryptionKey): IPromise<any>{
+            let q: IDeferred<any> = $q.defer();
+
+            // If encrypted
+            if (this._data.encryption_type_to_use) {
+                if (!encryptionKey){
+                    // @todo Proper error
+                    q.reject("Need encryption key");
+                    return q.promise;
+                }
+
+                let encrypted: string = this.encrypt(encryptionKey, content);
+
+                if (encrypted) {
+                    this._data.encrypted_content = encrypted;
+                    this._data.encryption_type_used = 1;
+                    this._data.encryption_key_used = encryptionKey.name;
+                } else {
+                    // @todo proper error
+                    q.reject("Encryption failed");
+                    return q.promise;
+                }
+            } else {
+                // @todo: webservice should do this automatically
+                this._data.encryption_key_used = "";
+                this._data.encryption_type_used = 0;
+                this._data.content = content;
+            }
+
+            let data: any = {
+                content: this._data.content,
+                encrypted_content: this._data.encrypted_content,
+                encryption_type_used: this._data.encryption_type_used,
+                encryption_key_used: this._data.encryption_key_used,
+            };
+
+            let requestData: any = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: data,
+            };
+
+            api.savePageContent(requestData).then((res: any) => {
+                this._data.seq_no = res.data.seq_no; // @todo Do we need this? should be probably updated in rest - if not updated rest will load update even though it already has it
+                q.resolve(res);
+            }, q.reject);
+
+            return q.promise;
+        }
+
+        private pushDelta(data: IPageDelta): IPromise<any>{
+            let q: IDeferred<any> = $q.defer();
+
+            let requestData: any = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: data,
+            };
+
+            api.savePageContentDelta(requestData).then(q.resolve, q.reject);
+
+            return q.promise;
+        }
+
         private updatePageType(pageType: number): number{
             if (pageType > 0 && pageType < 5 || pageType === 7){
                 pageType += 1000;
@@ -545,32 +634,9 @@ namespace ipushpull {
             return pageType;
         }
 
-        /*private encrypt(key?: any): boolean {
-            if (!key) {
-                key = ippKeyring.getKey(this.folderName, this.data.encryption_key_to_use);
-            }
-
-            if (!key) {
-                let passphrase = prompt("This page should be encrypted with key " + this.data.encryption_key_to_use + ". Please input the passphrase");
-
-                if (!passphrase) return false;
-
-                key = {
-                    name: this.data.encryption_key_to_use,
-                    passphrase: passphrase
-                };
-
-                ippKeyring.saveKey(this.folderName, key, false);
-            }
-
-            this.data.encrypted_content = ippCrypto.encryptContent(key, this.data.content); // @todo: Handle encryption error
-            this.data.content = [];
-
-            this.data.encryption_type_used = 1;
-            this.data.encryption_key_used = key.name;
-
-            return true;
-        }*/
+        private encrypt(key: IEncryptionKey, content: IPageContent): string {
+            return crypto.encryptContent(key, content); // @todo: Handle encryption error
+        }
     }
 
     interface IPageProvider extends IEventEmitter {

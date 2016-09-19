@@ -35,6 +35,11 @@ module.exports = function(grunt){
         },
 
         uglify: {
+            options: {
+                compress: {
+                    drop_console: true
+                }
+            },
             ipushpull: {
                 src: "build/ng-ipushpull.js",
                 dest: "build/ng-ipushpull.min.js",

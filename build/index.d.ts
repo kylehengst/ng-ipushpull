@@ -196,8 +196,8 @@ declare namespace ipushpull {
         domain_url: string;
         encrypted_content: string;
         encryption_key_to_use: string;
-        encryption_key_used: number;
-        encryption_type_to_use: string;
+        encryption_key_used: string;
+        encryption_type_to_use: number;
         encryption_type_used: number;
         is_obscured_public: boolean;
         is_public: boolean;
@@ -210,6 +210,19 @@ declare namespace ipushpull {
         seq_no: number;
         show_gridlines: boolean;
         special_page_type: number;
+    }
+    interface IPageDeltaContentCol {
+        col_index: number;
+        cell_content: IPageContentCell;
+    }
+    interface IPageDeltaContentRow {
+        row_index: number;
+        cols: IPageDeltaContentCol[];
+    }
+    interface IPageDelta {
+        new_rows: number[];
+        new_cols: number[];
+        content_delta: IPageDeltaContentRow[];
     }
     interface IPage extends IPageServiceMeta {
     }
@@ -312,7 +325,7 @@ declare namespace ipushpull {
         access: IUserPageAccess;
         start: () => void;
         stop: () => void;
-        push: () => void;
+        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
         destroy: () => void;
         clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
     }
