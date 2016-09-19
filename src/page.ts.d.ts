@@ -205,6 +205,7 @@ declare namespace ipushpull {
         stop: () => void;
         push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
         destroy: () => void;
+        decrypt: (key: IEncryptionKey) => void;
         clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
     }
 }

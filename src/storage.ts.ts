@@ -181,13 +181,16 @@ namespace ipushpull {
     }*/
 
     export interface IStorageService {
+        prefix: string;
+        suffix: string;
+
         create: (key: string, value: string) => void;
         save: (key: string, value: string) => void;
         get: (key: string, defaultValue?: any) => any;
         remove: (key: string) => void;
     }
 
-    class LocalStorage {
+    class LocalStorage implements IStorageService{
         // public static $inject: string[] = [];
 
         public prefix: string = "ipp";
@@ -232,7 +235,7 @@ namespace ipushpull {
             return key;
         }
 
-        private isValidJSON(val: any){
+        private isValidJSON(val: any): boolean{
             try{
                 let json: any = JSON.parse(val);
                 return true;
@@ -243,7 +246,7 @@ namespace ipushpull {
     }
 
     ipushpull.module.service("ippUserStorageService", ["ippAuthService", (ippAuth: IAuthService) => {
-        let storage =  new LocalStorage();
+        let storage: IStorageService =  new LocalStorage();
         storage.suffix = "GUEST";
 
         ippAuth.on("logged_in", () => {

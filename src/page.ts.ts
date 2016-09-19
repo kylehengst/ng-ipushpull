@@ -283,6 +283,7 @@ namespace ipushpull {
         stop: () => void;
         push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
         destroy: () => void;
+        decrypt: (key: IEncryptionKey) => void;
         clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
     }
 
@@ -319,7 +320,10 @@ namespace ipushpull {
         private _pageName: string;
         private _folderName: string;
 
-        private _passphrase: string = "";
+        private _encryptionKey: IEncryptionKey = {
+            name: "",
+            passphrase: "",
+        };
 
         public static create(folderId: number, name: string, type: number, template?: IPageTemplate): IPromise<IPageService>{
             let q: IDeferred<IPageService> = $q.defer();
@@ -392,7 +396,7 @@ namespace ipushpull {
             }
         }
 
-        public set passphrase(passphrase: string){ this._passphrase = passphrase; }
+        public set encryptionKey(key: IEncryptionKey){ this._encryptionKey = key; }
 
         public get data(): IPage{ return this._data; }
         public get access(): IUserPageAccess { return this._access; }
@@ -407,11 +411,50 @@ namespace ipushpull {
             this.updatesOn = false;
         }
 
-        public push(data: IPageContent|IPageDelta, delta: boolean = true, encryptionKey?: IEncryptionKey): IPromise<any> {
+        public push(data: IPageContent|IPageDelta, delta: boolean = true): IPromise<any> {
             if (delta){
                 return this.pushDelta(<IPageDelta>data);
             } else {
-                return this.pushFull(<IPageContent>data, encryptionKey);
+                return this.pushFull(<IPageContent>data);
+            }
+        }
+
+        // @todo This is NOT good
+        public decrypt(key?: IEncryptionKey): void {
+            // @todo Oh lord...
+            if (!key){
+                key = this._encryptionKey;
+            }
+
+            // Fail silently if we dont have passphrase
+            // @todo oh sweet jesus...
+            if (this._data.encryption_type_used && !key.passphrase){
+                return;
+            }
+
+            // Check for encryption and decrypt
+            if (this._data.encryption_type_used) {
+                let decrypted: any = crypto.decryptContent({
+                    name: key.name,
+                    passphrase: key.passphrase,
+                }, this._data.encrypted_content);
+
+                if (decrypted){
+                    this.decrypted = true;
+                    this._data.content = decrypted;
+                    this._encryptionKey = key;
+                } else {
+                    this.decrypted = false;
+                    // I am pretty sure we will want something more specific for decryption than just message
+                    this.emit(this.EVENT_ERROR, new Error(`Could not decrypt page with key "${key.name}" and passphrase "${key.passphrase}"`));
+                }
+            } else {
+                this.decrypted = true;
+            }
+
+            // @todo ouch...
+            if (this.decrypted){
+                this._data.content = PageStyles.decompressStyles(this._data.content);
             }
         }
 
@@ -505,28 +548,9 @@ namespace ipushpull {
             this._provider.on("content_update", (data) => {
                 data.special_page_type = this.updatePageType(data.special_page_type);
 
-                // Check for encryption and decrypt
-                if (data.encryption_type_used) {
-                    let decrypted: any = crypto.decryptContent({
-                        name: data.encryption_key_used,
-                        passphrase: this._passphrase,
-                    }, data.encrypted_content);
-
-                    if (decrypted){
-                        this.decrypted = true;
-                        data.content = decrypted;
-                    } else {
-                        this.decrypted = false;
-                        this.emit(this.EVENT_ERROR, "Decryption failed");
-                    }
-                } else {
-                    this.decrypted = true;
-                }
-
-                // Decompress styles
-                data.content = PageStyles.decompressStyles(data.content);
-
                 this._data = angular.merge({}, this._data, data);
+
+                this.decrypt();
 
                 // @todo Not a great logic - When do we consider for a page to actually be ready?
                 if (!this.ready){
@@ -555,23 +579,23 @@ namespace ipushpull {
             });
         }
 
-        private pushFull(content: IPageContent, encryptionKey?: IEncryptionKey): IPromise<any>{
+        private pushFull(content: IPageContent): IPromise<any>{
             let q: IDeferred<any> = $q.defer();
 
             // If encrypted
             if (this._data.encryption_type_to_use) {
-                if (!encryptionKey){
+                if (!this._encryptionKey || this._data.encryption_key_to_use !== this._encryptionKey.name){
                     // @todo Proper error
-                    q.reject("Need encryption key");
+                    q.reject("None or wrong encryption key");
                     return q.promise;
                 }
 
-                let encrypted: string = this.encrypt(encryptionKey, content);
+                let encrypted: string = this.encrypt(this._encryptionKey, content);
 
                 if (encrypted) {
                     this._data.encrypted_content = encrypted;
                     this._data.encryption_type_used = 1;
-                    this._data.encryption_key_used = encryptionKey.name;
+                    this._data.encryption_key_used = this._encryptionKey.name;
                 } else {
                     // @todo proper error
                     q.reject("Encryption failed");

@@ -327,12 +327,15 @@ declare namespace ipushpull {
         stop: () => void;
         push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
         destroy: () => void;
+        decrypt: (key: IEncryptionKey) => void;
         clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
     }
 }
 
 declare namespace ipushpull {
     interface IStorageService {
+        prefix: string;
+        suffix: string;
         create: (key: string, value: string) => void;
         save: (key: string, value: string) => void;
         get: (key: string, defaultValue?: any) => any;

@@ -7266,13 +7266,18 @@ var ipushpull;
     "use strict";
     var Request = (function () {
         function Request(method, url) {
-            this._headers = {
-                "Content-Type": "application/json",
-            };
+            this._headers = {};
             this._cache = false;
             this._overrideLock = false;
             this._method = method;
             this._url = url;
+            this._headers = {
+                "Content-Type": "application/json",
+                "x-requested-with": "XMLHttpRequest",
+                "x-ipp-device-uuid": "",
+                "x-ipp-client": "",
+                "x-ipp-client-version": "",
+            };
         }
         Request.get = function (url) {
             return new Request("GET", url);
@@ -7903,7 +7908,10 @@ var ipushpull;
             this.decrypted = true;
             this.updatesOn = false;
             this._supportsWS = true;
-            this._passphrase = "";
+            this._encryptionKey = {
+                name: "",
+                passphrase: ""
+            };
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
             this._folderId = (!isNaN(+folderId)) ? folderId : undefined;
             this._pageId = (!isNaN(+pageId)) ? pageId : undefined;
@@ -8022,8 +8030,8 @@ var ipushpull;
             return q.promise;
         };
         ;
-        Object.defineProperty(Page.prototype, "passphrase", {
-            set: function (passphrase) { this._passphrase = passphrase; },
+        Object.defineProperty(Page.prototype, "encryptionKey", {
+            set: function (key) { this._encryptionKey = key; },
             enumerable: true,
             configurable: true
         });
@@ -8045,13 +8053,42 @@ var ipushpull;
             this._provider.stop();
             this.updatesOn = false;
         };
-        Page.prototype.push = function (data, delta, encryptionKey) {
+        Page.prototype.push = function (data, delta) {
             if (delta === void 0) { delta = true; }
             if (delta) {
                 return this.pushDelta(data);
             }
             else {
-                return this.pushFull(data, encryptionKey);
+                return this.pushFull(data);
+            }
+        };
+        Page.prototype.decrypt = function (key) {
+            if (!key) {
+                key = this._encryptionKey;
+            }
+            if (this._data.encryption_type_used && !key.passphrase) {
+                return;
+            }
+            if (this._data.encryption_type_used) {
+                var decrypted = crypto.decryptContent({
+                    name: key.name,
+                    passphrase: key.passphrase,
+                }, this._data.encrypted_content);
+                if (decrypted) {
+                    this.decrypted = true;
+                    this._data.content = decrypted;
+                    this._encryptionKey = key;
+                }
+                else {
+                    this.decrypted = false;
+                    this.emit(this.EVENT_ERROR, new Error("Could not decrypt page with key \"" + key.name + "\" and passphrase \"" + key.passphrase + "\""));
+                }
+            }
+            else {
+                this.decrypted = true;
+            }
+            if (this.decrypted) {
+                this._data.content = PageStyles.decompressStyles(this._data.content);
             }
         };
         Page.prototype.destroy = function () {
@@ -8121,25 +8158,8 @@ var ipushpull;
             var _this = this;
             this._provider.on("content_update", function (data) {
                 data.special_page_type = _this.updatePageType(data.special_page_type);
-                if (data.encryption_type_used) {
-                    var decrypted = crypto.decryptContent({
-                        name: data.encryption_key_used,
-                        passphrase: _this._passphrase,
-                    }, data.encrypted_content);
-                    if (decrypted) {
-                        _this.decrypted = true;
-                        data.content = decrypted;
-                    }
-                    else {
-                        _this.decrypted = false;
-                        _this.emit(_this.EVENT_ERROR, "Decryption failed");
-                    }
-                }
-                else {
-                    _this.decrypted = true;
-                }
-                data.content = PageStyles.decompressStyles(data.content);
                 _this._data = angular.merge({}, _this._data, data);
+                _this.decrypt();
                 if (!_this.ready) {
                     _this.ready = true;
                     _this.emit(_this.EVENT_READY);
@@ -8157,19 +8177,19 @@ var ipushpull;
                 _this.emit(_this.EVENT_ERROR, err);
             });
         };
-        Page.prototype.pushFull = function (content, encryptionKey) {
+        Page.prototype.pushFull = function (content) {
             var _this = this;
             var q = $q.defer();
             if (this._data.encryption_type_to_use) {
-                if (!encryptionKey) {
-                    q.reject("Need encryption key");
+                if (!this._encryptionKey || this._data.encryption_key_to_use !== this._encryptionKey.name) {
+                    q.reject("None or wrong encryption key");
                     return q.promise;
                 }
-                var encrypted = this.encrypt(encryptionKey, content);
+                var encrypted = this.encrypt(this._encryptionKey, content);
                 if (encrypted) {
                     this._data.encrypted_content = encrypted;
                     this._data.encryption_type_used = 1;
-                    this._data.encryption_key_used = encryptionKey.name;
+                    this._data.encryption_key_used = this._encryptionKey.name;
                 }
                 else {
                     q.reject("Encryption failed");
