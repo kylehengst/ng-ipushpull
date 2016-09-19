@@ -2,13 +2,9 @@
  * Todo list
  * ------------------------------
  * @todo Even if autostart is off we should probably do the initial load....
- * @todo Implement creating and cloning of pages
- * @todo Emit something to indicate initial load
  * @todo expose function to trigger decryption
- * @todo alter page special page type for better manipulation later (reports 1000+)
- * @todo proper interfaces and constants
- * @todo parse all styles - convert from our model to cell-by-cell model
  * @todo Socket should have proper implementation of start/stop mechanism
+ * @todo Clonning encrypted pages - possible ?
  */
 
 namespace ipushpull {
@@ -259,7 +255,6 @@ namespace ipushpull {
 
     ipushpull.module.service("ippPageService", PageWrap);
 
-    // @todo extend event emitter interface
     export interface IPageService extends IEventEmitter {
         TYPE_REGULAR: number;
         TYPE_ALERT: number;
@@ -327,7 +322,6 @@ namespace ipushpull {
         private _passphrase: string = "";
 
         public static create(folderId: number, name: string, type: number, template?: IPageTemplate): IPromise<IPageService>{
-            // @todo Should we re-use clone function?
             let q: IDeferred<IPageService> = $q.defer();
 
             if (template){
@@ -363,7 +357,6 @@ namespace ipushpull {
             return q.promise;
         };
 
-        // @todo Using type "any" for page and folder ids, because string | number throws compiler error http://stackoverflow.com/questions/39467714
         constructor(pageId?: number | string, folderId?: number | string, autoStart: boolean = true){
             super();
 
@@ -384,7 +377,7 @@ namespace ipushpull {
 
             this.updatesOn = autoStart;
 
-            // @todo If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
+            // If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
             if (!this._pageId) {
                 this.getPageId(this._folderName, this._pageName).then((res: any) => {
                     this._pageId = res.pageId;
@@ -500,7 +493,7 @@ namespace ipushpull {
                 q.resolve();
             }, (err) => {
                 // @todo Should we emit something?
-                // @toodo Handle error?
+                // @todo Handle error?
                 q.reject();
             });
 
@@ -605,7 +598,8 @@ namespace ipushpull {
             };
 
             api.savePageContent(requestData).then((res: any) => {
-                this._data.seq_no = res.data.seq_no; // @todo Do we need this? should be probably updated in rest - if not updated rest will load update even though it already has it
+                // @todo Do we need this? should be probably updated in rest - if not updated rest will load update even though it already has it
+                this._data.seq_no = res.data.seq_no;
                 q.resolve(res);
             }, q.reject);
 
@@ -635,7 +629,8 @@ namespace ipushpull {
         }
 
         private encrypt(key: IEncryptionKey, content: IPageContent): string {
-            return crypto.encryptContent(key, content); // @todo: Handle encryption error
+            // @todo: Handle encryption error
+            return crypto.encryptContent(key, content);
         }
     }
 
@@ -689,7 +684,6 @@ namespace ipushpull {
         private load(ignoreSeqNo: boolean = false): IPromise<IPage> {
             let q: IDeferred<IPage> = $q.defer();
 
-            // @todo Returning promise, and rejecting before return? need test
             if (this._requestOngoing || this._stopped){
                 // @todo Should we emit something?
                 q.reject({});
@@ -807,7 +801,7 @@ namespace ipushpull {
             this._stopped = false;
         }
 
-        // @todo Disconnecting socket on stop might be too wasteful. Better just throw away updates?
+        // @todo Disconnecting socket on stop might be too wasteful. Better just throw away updates? or is that wasteful?
         public stop(): void {
             this._socket.disconnect();
 
@@ -854,7 +848,6 @@ namespace ipushpull {
         private onPageError = (data: any): void => {
             $timeout(() => {
                 if (data.code === 401){
-                    // @todo Try to silently re-login
                     auth.refreshTokens().then(() => {
                         this.start();
                     });
@@ -923,8 +916,8 @@ namespace ipushpull {
 
             "dot": "dotted",
             "dotted": "dotted",
-            "hairline": "dotted",
-            "mediumdashdotdot": "dotted", // @todo: Hairline is weight not style in excel (Whaaaat??),
+            "hairline": "dotted", // Hairline is weight not style in excel (Whaaaat??),
+            "mediumdashdotdot": "dotted",
             "dashdotdot": "dotted",
 
             "double": "double",

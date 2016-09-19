@@ -1,10 +1,3 @@
-/**
- * Todo list
- * ------------------------------
- * @todo Load user data on login
- * @todo Need to persist tokens somehow...
- */
-
 namespace ipushpull {
     "use strict";
     import IQService = angular.IQService;
@@ -61,7 +54,6 @@ namespace ipushpull {
         }
 
         // @todo better name?
-        // @todo need to get user info
         public authenticate(): IPromise<any>{
             let q: IDeferred<any> = this.$q.defer();
 

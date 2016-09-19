@@ -1,13 +1,3 @@
-/**
- *
- * @todo Add following to every request:
- *
- * $http.defaults.headers.common["x-requested-with"] = "XMLHttpRequest";
- * $http.defaults.headers.common["x-ipp-device-uuid"] = $rootScope.uuid;
- * $http.defaults.headers.common["x-ipp-client"] = $rootScope.ippCI;
- * $http.defaults.headers.common["x-ipp-client-version"] = ipp.config.version;
- */
-
 namespace ipushpull {
     "use strict";
 
@@ -17,7 +7,6 @@ namespace ipushpull {
     import IPromise = angular.IPromise;
     import IDeferred = angular.IDeferred;
     import IInjectorService = angular.auto.IInjectorService;
-    import IHttpRequestConfigHeaders = angular.IHttpRequestConfigHeaders;
 
     interface IRequest{
         method: (method: string) => IRequest;
@@ -38,9 +27,7 @@ namespace ipushpull {
     class Request implements IRequest {
         private _method: string;
         private _url: string;
-        private _headers: {[s: string]: string} = {
-            "Content-Type": "application/json",
-        };
+        private _headers: {[s: string]: string} = {};
         private _data: any;
         private _params: any;
         private _cache: boolean = false;
@@ -65,6 +52,14 @@ namespace ipushpull {
         constructor (method: string, url: string){
             this._method = method;
             this._url = url;
+
+            this._headers = {
+                "Content-Type": "application/json",
+                "x-requested-with": "XMLHttpRequest",
+                "x-ipp-device-uuid": "", // @todo get uuid somehow - local storage
+                "x-ipp-client": "", // @todo get client id - ipp config
+                "x-ipp-client-version": "", // @todo get client version - ipp config
+            };
         }
 
         // @todo Bleh...
@@ -188,7 +183,6 @@ namespace ipushpull {
             let msg: string = def;
 
             if (err.data){
-                // @todo replace Object.keys with custom function because it is not supported in all browsers
                 let keys: string[] = Object.keys(err.data);
                 if (keys.length){
                     if (angular.isArray(err.data[keys[0]])){

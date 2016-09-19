@@ -2,6 +2,7 @@
  *
  * @todo Add expire field to cookie provider
  * @todo Somehow configurable prefix
+ * @todo Well... overall better/proper implementation
  */
 
 namespace ipushpull {
