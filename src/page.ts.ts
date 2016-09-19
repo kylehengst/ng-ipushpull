@@ -1,6 +1,7 @@
 /**
  * Todo list
  * ------------------------------
+ * @todo Even if autostart is off we should probably do the initial load....
  * @todo Implement creating and cloning of pages
  * @todo Emit something to indicate initial load
  * @todo expose function to trigger decryption
@@ -188,6 +189,23 @@ namespace ipushpull {
         write_access: boolean;
     }
 
+    export interface IPageTemplate {
+        by_name_url: string;
+        category: string;
+        description: string;
+        domain_id: number;
+        domain_name: string;
+        id: number;
+        name: string;
+        special_page_type: number;
+        url: string;
+        uuid: string;
+    }
+
+    export interface IPageCloneOptions {
+        clone_ranges?: boolean;
+    }
+
     // Main/public page service
     let $q: IQService, $timeout: ITimeoutService, $interval: IIntervalService, api: IApiService, auth: IAuthService, storage: IStorageService, crypto: ICryptoService, config: IIPPConfig;
 
@@ -236,12 +254,14 @@ namespace ipushpull {
         TYPE_PAGE_UPDATE_REPORT: number;
         TYPE_LIVE_USAGE_REPORT: number;
 
+        EVENT_READY: string;
         EVENT_NEW_CONTENT: string;
         EVENT_NEW_META: string;
         EVENT_ERROR: string;
 
         ready: boolean;
         decrypted: boolean;
+        updatesOn: boolean;
 
         passphrase: string;
 
@@ -252,6 +272,7 @@ namespace ipushpull {
         stop: () => void;
         push: () => void;
         destroy: () => void;
+        clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
     }
 
     class Page extends EventEmitter implements IPageService {
@@ -264,6 +285,7 @@ namespace ipushpull {
         public get TYPE_PAGE_UPDATE_REPORT(): number { return 1004; }
         public get TYPE_LIVE_USAGE_REPORT(): number { return 1007; }
 
+        public get EVENT_READY(): string { return "ready"; }
         public get EVENT_NEW_CONTENT(): string { return "new_content"; }
         public get EVENT_NEW_META(): string { return "new_meta"; }
         public get EVENT_ACCESS_UPDATED(): string { return "access_updated"; }
@@ -271,6 +293,7 @@ namespace ipushpull {
 
         public ready: boolean = false;
         public decrypted: boolean = true;
+        public updatesOn: boolean = false; // @todo I dont like this...
 
         private _supportsWS: boolean = true; // let's be optimistic by default
         private _provider: IPageProvider;
@@ -286,6 +309,39 @@ namespace ipushpull {
         private _folderName: string;
 
         private _passphrase: string = "";
+
+        public static create(folderId: number, name: string, type: number, template?: IPageTemplate): IPromise<IPageService>{
+            // @todo Should we re-use clone function?
+            let q: IDeferred<IPageService> = $q.defer();
+
+            if (template){
+                let page: IPageService = new Page(template.id, template.domain_id);
+                // @todo this business with autostart and receiving data etc is quite fiddly to say the least
+                page.on(page.EVENT_READY, () => {
+                    page.clone(folderId, name).then(q.resolve, q.reject);
+                });
+            } else {
+                api.createPage({
+                    domainId: folderId,
+                    data: {
+                        name: name,
+                        special_page_type: type,
+                    },
+                }).then((res) => {
+                    // Start new page
+                    let page: IPageService = new Page(res.data.id, folderId);
+                    // @todo this business with autostart and receiving data etc is quite fiddly to say the least
+                    page.on(page.EVENT_READY, () => {
+                        page.stop();
+                        q.resolve(page);
+                    });
+                }, (err) => {
+                    q.reject(err);
+                });
+            }
+
+            return q.promise;
+        };
 
         // @todo Using type "any" for page and folder ids, because string | number throws compiler error http://stackoverflow.com/questions/39467714
         constructor(pageId?: number | string, folderId?: number | string, autoStart: boolean = true){
@@ -306,6 +362,8 @@ namespace ipushpull {
                 autoStart = false;
             }
 
+            this.updatesOn = autoStart;
+
             // @todo If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
             if (!this._pageId) {
                 this.getPageId(this._folderName, this._pageName).then((res: any) => {
@@ -324,14 +382,16 @@ namespace ipushpull {
         public set passphrase(passphrase: string){ this._passphrase = passphrase; }
 
         public get data(): IPage{ return this._data; }
-        public get access(): IUserPageAccess {return this._access; }
+        public get access(): IUserPageAccess { return this._access; }
 
         public start(): void{
             this._provider.start();
+            this.updatesOn = true;
         }
 
         public stop(): void{
             this._provider.stop();
+            this.updatesOn = false;
         }
 
         public push(): void{
@@ -342,6 +402,34 @@ namespace ipushpull {
             this._provider.destroy();
             $interval.cancel(this._accessInterval);
             this.removeEvent();
+        }
+
+        public clone(folderId: number, name: string, options: IPageCloneOptions = {}): IPromise<IPageService> {
+            let q: IDeferred<IPageService> = $q.defer();
+
+            if (!this.ready){
+                q.reject("Page is not ready");
+                return q.promise;
+            }
+
+            // Prevent cloning ranges between folders
+            // @todo This is done silently at the moment, should it reject the transaction?
+            if (options.clone_ranges && this._folderId !== folderId){
+                options.clone_ranges = false;
+            }
+
+            // First create new page
+            Page.create(this._folderId, name, this.data.special_page_type).then((newPage: IPageService) => {
+                // @todo Copy settings
+
+                // @todo Copy content
+
+                q.resolve(newPage);
+            }, (err) => {
+                q.reject(err);
+            });
+
+            return q.promise;
         }
 
         private init(autoStart: boolean = true): void{
@@ -398,6 +486,9 @@ namespace ipushpull {
             // Setup listeners
             this._provider.on("content_update", (data) => {
                 // @todo should change only on initial load, so might move it somewhere else
+                if (!this.ready){
+                    this.emit(this.EVENT_READY);
+                }
                 this.ready = true;
 
                 data.special_page_type = this.updatePageType(data.special_page_type);
@@ -650,7 +741,7 @@ namespace ipushpull {
             this._stopped = false;
         }
 
-        // @todo Will be done better
+        // @todo Disconnecting socket on stop might be too wasteful. Better just throw away updates?
         public stop(): void {
             this._socket.disconnect();
 

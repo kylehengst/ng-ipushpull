@@ -7901,6 +7901,7 @@ var ipushpull;
             _super.call(this);
             this.ready = false;
             this.decrypted = true;
+            this.updatesOn = false;
             this._supportsWS = true;
             this._passphrase = "";
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
@@ -7911,6 +7912,7 @@ var ipushpull;
             if (!this._pageId) {
                 autoStart = false;
             }
+            this.updatesOn = autoStart;
             if (!this._pageId) {
                 this.getPageId(this._folderName, this._pageName).then(function (res) {
                     _this._pageId = res.pageId;
@@ -7963,6 +7965,11 @@ var ipushpull;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Page.prototype, "EVENT_READY", {
+            get: function () { return "ready"; },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Page.prototype, "EVENT_NEW_CONTENT", {
             get: function () { return "new_content"; },
             enumerable: true,
@@ -7983,6 +7990,34 @@ var ipushpull;
             enumerable: true,
             configurable: true
         });
+        Page.create = function (folderId, name, type, template) {
+            var q = $q.defer();
+            if (template) {
+                var page_1 = new Page(template.id, template.domain_id);
+                page_1.on(page_1.EVENT_READY, function () {
+                    page_1.clone(folderId, name).then(q.resolve, q.reject);
+                });
+            }
+            else {
+                api.createPage({
+                    domainId: folderId,
+                    data: {
+                        name: name,
+                        special_page_type: type,
+                    },
+                }).then(function (res) {
+                    var page = new Page(res.data.id, folderId);
+                    page.on(page.EVENT_READY, function () {
+                        page.stop();
+                        q.resolve(page);
+                    });
+                }, function (err) {
+                    q.reject(err);
+                });
+            }
+            return q.promise;
+        };
+        ;
         Object.defineProperty(Page.prototype, "passphrase", {
             set: function (passphrase) { this._passphrase = passphrase; },
             enumerable: true,
@@ -8000,9 +8035,11 @@ var ipushpull;
         });
         Page.prototype.start = function () {
             this._provider.start();
+            this.updatesOn = true;
         };
         Page.prototype.stop = function () {
             this._provider.stop();
+            this.updatesOn = false;
         };
         Page.prototype.push = function () {
             return;
@@ -8011,6 +8048,23 @@ var ipushpull;
             this._provider.destroy();
             $interval.cancel(this._accessInterval);
             this.removeEvent();
+        };
+        Page.prototype.clone = function (folderId, name, options) {
+            if (options === void 0) { options = {}; }
+            var q = $q.defer();
+            if (!this.ready) {
+                q.reject("Page is not ready");
+                return q.promise;
+            }
+            if (options.clone_ranges && this._folderId !== folderId) {
+                options.clone_ranges = false;
+            }
+            Page.create(this._folderId, name, this.data.special_page_type).then(function (newPage) {
+                q.resolve(newPage);
+            }, function (err) {
+                q.reject(err);
+            });
+            return q.promise;
         };
         Page.prototype.init = function (autoStart) {
             var _this = this;
@@ -8051,6 +8105,9 @@ var ipushpull;
         Page.prototype.registerListeners = function () {
             var _this = this;
             this._provider.on("content_update", function (data) {
+                if (!_this.ready) {
+                    _this.emit(_this.EVENT_READY);
+                }
                 _this.ready = true;
                 data.special_page_type = _this.updatePageType(data.special_page_type);
                 if (data.encryption_type_used) {
