@@ -7683,14 +7683,15 @@ var ipushpull;
             this.storage = storage;
             this.config = config;
             this._user = {};
+            this._authenticated = false;
         }
         Object.defineProperty(Auth.prototype, "EVENT_LOGGED_IN", {
             get: function () { return "logged_in"; },
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Auth.prototype, "EVENT_RE_LOGGED_IN", {
-            get: function () { return "re_logged"; },
+        Object.defineProperty(Auth.prototype, "EVENT_RE_LOGGING", {
+            get: function () { return "re_logging"; },
             enumerable: true,
             configurable: true
         });
@@ -7712,11 +7713,17 @@ var ipushpull;
         Auth.prototype.authenticate = function () {
             var _this = this;
             var q = this.$q.defer();
+            if (this._authenticated) {
+                q.resolve();
+                return q.promise;
+            }
             if (this.storage.get("access_token")) {
                 this.getUserInfo().then(function () {
+                    _this._authenticated = true;
                     _this.emit(_this.EVENT_LOGGED_IN);
                     q.resolve();
                 }, function (err) {
+                    _this._authenticated = false;
                     _this.emit(_this.EVENT_ERROR, err);
                     q.reject(err);
                 });
@@ -7725,6 +7732,7 @@ var ipushpull;
                 return this.refreshTokens();
             }
             else {
+                this._authenticated = false;
                 q.reject("No tokens available");
             }
             return q.promise;
@@ -7738,17 +7746,11 @@ var ipushpull;
                 q.reject();
                 return q.promise;
             }
+            this.emit(this.EVENT_RE_LOGGING);
             this.ippApi.refreshAccessTokens(refreshToken).then(function (res) {
                 _this.storage.create("access_token", res.data.access_token);
                 _this.storage.create("refresh_token", res.data.refresh_token);
-                _this.getUserInfo().then(function () {
-                    _this.emit(_this.EVENT_RE_LOGGED_IN);
-                    _this.emit(_this.EVENT_LOGGED_IN);
-                    q.resolve();
-                }, function (err) {
-                    _this.emit(_this.EVENT_ERROR, err);
-                    q.reject(err);
-                });
+                _this.authenticate().then(q.resolve, q.reject);
             }, function (err) {
                 _this.emit(_this.EVENT_ERROR, err);
                 q.reject(err);
@@ -7767,13 +7769,7 @@ var ipushpull;
             }).then(function (res) {
                 _this.storage.create("access_token", res.data.access_token);
                 _this.storage.create("refresh_token", res.data.refresh_token);
-                _this.getUserInfo().then(function () {
-                    _this.emit(_this.EVENT_LOGGED_IN);
-                    q.resolve();
-                }, function (err) {
-                    _this.emit(_this.EVENT_ERROR, err);
-                    q.reject(err);
-                });
+                _this.authenticate().then(q.resolve, q.reject);
             }, function (err) {
                 err.message = "";
                 if (err.httpCode === 400 || err.httpCode === 401) {
@@ -7801,6 +7797,7 @@ var ipushpull;
             this.emit(this.EVENT_LOGGED_OUT);
             this.storage.remove("access_token");
             this.storage.remove("refresh_token");
+            this._authenticated = false;
         };
         Auth.prototype.getUserInfo = function () {
             var _this = this;

@@ -1245,7 +1245,7 @@ declare namespace ipushpull {
     import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
     interface IAuthService extends IEventEmitter {
         EVENT_LOGGED_IN: string;
-        EVENT_RE_LOGGED_IN: string;
+        EVENT_RE_LOGGING: string;
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
         user: IUserSelf;

@@ -7,7 +7,7 @@ namespace ipushpull {
 
     export interface IAuthService extends IEventEmitter {
         EVENT_LOGGED_IN: string;
-        EVENT_RE_LOGGED_IN: string;
+        EVENT_RE_LOGGING: string;
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
 
@@ -41,11 +41,12 @@ namespace ipushpull {
         public static $inject: string[] = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
 
         public get EVENT_LOGGED_IN(): string { return "logged_in"; }
-        public get EVENT_RE_LOGGED_IN(): string { return "re_logged"; }
+        public get EVENT_RE_LOGGING(): string { return "re_logging"; }
         public get EVENT_LOGGED_OUT(): string { return "logged_out"; }
         public get EVENT_ERROR(): string { return "error"; }
 
         private _user: IUserSelf | any = {};
+        private _authenticated: boolean = false;
 
         public get user(): IUserSelf { return this._user; }
 
@@ -57,17 +58,25 @@ namespace ipushpull {
         public authenticate(): IPromise<any>{
             let q: IDeferred<any> = this.$q.defer();
 
+            if (this._authenticated){
+                q.resolve();
+                return q.promise;
+            }
+
             if (this.storage.get("access_token")){
                 this.getUserInfo().then(() => {
+                    this._authenticated = true;
                     this.emit(this.EVENT_LOGGED_IN); // @todo Actually at this moment we have no idea if access token is valid
                     q.resolve();
                 }, (err) => {
+                    this._authenticated = false;
                     this.emit(this.EVENT_ERROR, err);
                     q.reject(err);
                 });
             } else if (this.storage.get("refresh_token")) {
                 return this.refreshTokens();
             } else {
+                this._authenticated = false;
                 q.reject("No tokens available");
             }
 
@@ -85,19 +94,13 @@ namespace ipushpull {
                 return q.promise;
             }
 
+            this.emit(this.EVENT_RE_LOGGING); // @todo do we need this?
+
             this.ippApi.refreshAccessTokens(refreshToken).then((res) => {
                 this.storage.create("access_token", res.data.access_token);
                 this.storage.create("refresh_token", res.data.refresh_token);
 
-                // @todo Code repetition from this.authenticate - just call that
-                this.getUserInfo().then(() => {
-                    this.emit(this.EVENT_RE_LOGGED_IN); // @todo do we need this?
-                    this.emit(this.EVENT_LOGGED_IN);
-                    q.resolve();
-                }, (err) => {
-                    this.emit(this.EVENT_ERROR, err);
-                    q.reject(err);
-                });
+                this.authenticate().then(q.resolve, q.reject);
             }, (err) => {
                 this.emit(this.EVENT_ERROR, err);
                 q.reject(err);
@@ -120,15 +123,7 @@ namespace ipushpull {
                 this.storage.create("access_token", res.data.access_token);
                 this.storage.create("refresh_token", res.data.refresh_token);
 
-                // @todo Code repetition from this.authenticate - just call that
-                this.getUserInfo().then(() => {
-                    this.emit(this.EVENT_LOGGED_IN);
-                    q.resolve();
-                }, (err) => {
-                    this.emit(this.EVENT_ERROR, err);
-                    q.reject(err);
-                });
-
+                this.authenticate().then(q.resolve, q.reject);
             }, (err) => {
                 err.message = "";
                 if (err.httpCode === 400 || err.httpCode === 401) {
@@ -160,6 +155,8 @@ namespace ipushpull {
 
             this.storage.remove("access_token");
             this.storage.remove("refresh_token");
+
+            this._authenticated = false;
         }
 
         private getUserInfo(): IPromise<IUserSelf> {
