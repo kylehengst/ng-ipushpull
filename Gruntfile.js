@@ -4,7 +4,7 @@ module.exports = function(grunt){
     grunt.loadNpmTasks('grunt-contrib-concat');
     grunt.loadNpmTasks('grunt-bump');
 
-    grunt.registerTask('build', ['clean', 'concat:ipushpull', 'concat:definition', 'uglify:ipushpull']);
+    grunt.registerTask('build', ['clean', 'concat:ipushpull', 'concat:ipushpull_standalone', 'concat:definition', 'uglify:ipushpull', 'uglify:ipushpull_standalone']);
     grunt.registerTask('release', ['build', 'bump']);
 
     grunt.initConfig({
@@ -20,6 +20,13 @@ module.exports = function(grunt){
                 dest: 'build/ng-ipushpull.js',
                 src: [
                     'bower_components/eventEmitter/EventEmitter.min.js',
+                    'src/ipushpull.ts.js',
+                    'src/**/*.ts.js',
+                ]
+            },
+            ipushpull_standalone: {
+                dest: 'build/ng-ipushpull-standalone.js',
+                src: [
                     'bower_components/forge/js/forge.min.js',
                     'bower_components/socket.io-client/socket.io.js',
                     'src/ipushpull.ts.js',
@@ -45,6 +52,10 @@ module.exports = function(grunt){
             ipushpull: {
                 src: "build/ng-ipushpull.js",
                 dest: "build/ng-ipushpull.min.js",
+            },
+            ipushpull_standalone: {
+                src: "build/ng-ipushpull-standalone.js",
+                dest: "build/ng-ipushpull-standalone.min.js",
             }
         },
 

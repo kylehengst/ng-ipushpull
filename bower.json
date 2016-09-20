@@ -30,11 +30,11 @@
     "src"
   ],
   "dependencies": {
-    "angular": ">= 1.2.0"
+    "angular": ">= 1.2.0",
+    "socket.io-client": "^1.4.6",
+    "forge": "^0.6.42"
   },
   "devDependencies": {
-    "socket.io-client": "^1.4.6",
-    "eventEmitter": "^5.1.0",
-    "forge": "^0.6.42"
+    "eventEmitter": "^5.1.0"
   }
 }

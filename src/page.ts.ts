@@ -2,20 +2,13 @@
  * Todo list
  * ------------------------------
  * @todo Even if autostart is off we should probably do the initial load....
- * @todo expose function to trigger decryption
  * @todo Socket should have proper implementation of start/stop mechanism
  * @todo Clonning encrypted pages - possible ?
  */
 
+// Interfaces - separating for easier IDE collapsing
 namespace ipushpull {
     "use strict";
-    import IDeferred = angular.IDeferred;
-    import Socket = SocketIOClient.Socket;
-    import IPromise = angular.IPromise;
-    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
-    import IQService = angular.IQService;
-    import ITimeoutService = angular.ITimeoutService;
-    import IIntervalService = angular.IIntervalService;
 
     export interface IPageContentLink {
         external: boolean;
@@ -218,6 +211,51 @@ namespace ipushpull {
         clone_ranges?: boolean;
     }
 
+    export interface IPageService extends IEventEmitter {
+        TYPE_REGULAR: number;
+        TYPE_ALERT: number;
+        TYPE_PDF: number;
+        TYPE_PAGE_ACCESS_REPORT: number;
+        TYPE_DOMAIN_USAGE_REPORT: number;
+        TYPE_GLOBAL_USAGE_REPORT: number;
+        TYPE_PAGE_UPDATE_REPORT: number;
+        TYPE_LIVE_USAGE_REPORT: number;
+
+        EVENT_READY: string;
+        EVENT_NEW_CONTENT: string;
+        EVENT_NEW_META: string;
+        EVENT_DECRYPTED: string;
+        EVENT_ERROR: string;
+
+        ready: boolean;
+        decrypted: boolean;
+        updatesOn: boolean;
+
+        encryptionKeyPull: IEncryptionKey;
+        encryptionKeyPush: IEncryptionKey;
+
+        data: IPage;
+        access: IUserPageAccess;
+
+        start: () => void;
+        stop: () => void;
+        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
+        destroy: () => void;
+        decrypt: (key: IEncryptionKey) => void;
+        clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
+    }
+}
+
+namespace ipushpull {
+    "use strict";
+    import IDeferred = angular.IDeferred;
+    import Socket = SocketIOClient.Socket;
+    import IPromise = angular.IPromise;
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    import IQService = angular.IQService;
+    import ITimeoutService = angular.ITimeoutService;
+    import IIntervalService = angular.IIntervalService;
+
     // Main/public page service
     let $q: IQService, $timeout: ITimeoutService, $interval: IIntervalService, api: IApiService, auth: IAuthService, storage: IStorageService, crypto: ICryptoService, config: IIPPConfig;
 
@@ -254,40 +292,6 @@ namespace ipushpull {
     }
 
     ipushpull.module.service("ippPageService", PageWrap);
-
-    export interface IPageService extends IEventEmitter {
-        TYPE_REGULAR: number;
-        TYPE_ALERT: number;
-        TYPE_PDF: number;
-        TYPE_PAGE_ACCESS_REPORT: number;
-        TYPE_DOMAIN_USAGE_REPORT: number;
-        TYPE_GLOBAL_USAGE_REPORT: number;
-        TYPE_PAGE_UPDATE_REPORT: number;
-        TYPE_LIVE_USAGE_REPORT: number;
-
-        EVENT_READY: string;
-        EVENT_NEW_CONTENT: string;
-        EVENT_NEW_META: string;
-        EVENT_DECRYPTED: string;
-        EVENT_ERROR: string;
-
-        ready: boolean;
-        decrypted: boolean;
-        updatesOn: boolean;
-
-        encryptionKeyPull: IEncryptionKey;
-        encryptionKeyPush: IEncryptionKey;
-
-        data: IPage;
-        access: IUserPageAccess;
-
-        start: () => void;
-        stop: () => void;
-        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
-        destroy: () => void;
-        decrypt: (key: IEncryptionKey) => void;
-        clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
-    }
 
     class Page extends EventEmitter implements IPageService {
         public get TYPE_REGULAR(): number { return 0; }
@@ -373,7 +377,7 @@ namespace ipushpull {
             return q.promise;
         };
 
-        constructor(pageId?: number | string, folderId?: number | string, autoStart: boolean = true){
+        constructor(pageId: number | string, folderId: number | string, autoStart: boolean = true){
             super();
 
             // Decide if client can use websockets
@@ -441,7 +445,7 @@ namespace ipushpull {
 
             // Fail silently if we dont have passphrase
             // @todo oh sweet jesus...
-            if (this._data.encryption_type_used && !key.passphrase){
+            if (this._data.encryption_type_used && !key.passphrase){ console.log("no pass");
                 this.decrypted = false;
                 return;
             }
@@ -511,8 +515,13 @@ namespace ipushpull {
         }
 
         private init(autoStart: boolean = true): void{
+            if (!this._supportsWS || typeof io === "undefined"){
+                console.warn("[iPushPull] Cannot use websocket technology it is not supported or websocket library is not included. " +
+                    "Make sure socket-io client is incldued or use ng-ipushpull-standalone.min.js");
+            }
+
             // Create provider
-            this._provider = (!this._supportsWS || config.transport === "polling")
+            this._provider = (!this._supportsWS || typeof io === "undefined" || config.transport === "polling")
                 ? new ProviderREST(this._pageId, this._folderId, autoStart)
                 : new ProviderSocket(this._pageId, this._folderId, autoStart);
 
@@ -592,7 +601,14 @@ namespace ipushpull {
             });
 
             this._provider.on("error", (err) => {
-                this.emit(this.EVENT_ERROR, err);
+                err.code = err.httpCode || err.code;
+                err.message = err.httpText || err.message;
+
+                if (err.code === 404){
+                    this.stop();
+                }
+
+                this.emit(this.EVENT_ERROR, err.message);
             });
         }
 
@@ -763,7 +779,7 @@ namespace ipushpull {
                     q.reject({});
                 }
             }, (err) => {
-                this.emit("error", err.httpText);
+                this.emit("error", err);
                 q.reject(err);
             }).finally(() => {
                 this._requestOngoing = false;

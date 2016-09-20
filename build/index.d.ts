@@ -1296,8 +1296,6 @@ declare namespace ipushpull {
 }
 
 declare namespace ipushpull {
-    import IPromise = angular.IPromise;
-    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
     interface IPageContentLink {
         external: boolean;
         address: string;
@@ -1479,34 +1477,8 @@ declare namespace ipushpull {
     interface IPageCloneOptions {
         clone_ranges?: boolean;
     }
-    interface IPageService extends IEventEmitter {
-        TYPE_REGULAR: number;
-        TYPE_ALERT: number;
-        TYPE_PDF: number;
-        TYPE_PAGE_ACCESS_REPORT: number;
-        TYPE_DOMAIN_USAGE_REPORT: number;
-        TYPE_GLOBAL_USAGE_REPORT: number;
-        TYPE_PAGE_UPDATE_REPORT: number;
-        TYPE_LIVE_USAGE_REPORT: number;
-        EVENT_READY: string;
-        EVENT_NEW_CONTENT: string;
-        EVENT_NEW_META: string;
-        EVENT_DECRYPTED: string;
-        EVENT_ERROR: string;
-        ready: boolean;
-        decrypted: boolean;
-        updatesOn: boolean;
-        encryptionKeyPull: IEncryptionKey;
-        encryptionKeyPush: IEncryptionKey;
-        data: IPage;
-        access: IUserPageAccess;
-        start: () => void;
-        stop: () => void;
-        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
-        destroy: () => void;
-        decrypt: (key: IEncryptionKey) => void;
-        clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
-    }
+}
+declare namespace ipushpull {
 }
 
 declare namespace ipushpull {

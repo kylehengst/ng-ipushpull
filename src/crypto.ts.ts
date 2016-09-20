@@ -25,6 +25,10 @@ namespace ipushpull {
          * @returns {any}
          */
         public decryptContent(key: any, data: string): IPageContent {
+            if (!this.libCheck()){
+                return;
+            }
+
             if (!data) return undefined;
 
             let rawData: string = forge.util.decode64(data);
@@ -58,6 +62,10 @@ namespace ipushpull {
          * @returns {any}
          */
         public encryptContent (key: IEncryptionKey, data: IPageContent): string {
+            if (!this.libCheck()){
+                return;
+            }
+
             let readyData: string = JSON.stringify(data); // Stringify JS object data
 
             let hash: string = this.hashPassphrase(key.passphrase);
@@ -90,6 +98,15 @@ namespace ipushpull {
             let md: any = forge.md.sha256.create();
             md.update(passphrase);
             return md.digest().bytes();
+        }
+
+        private libCheck(): boolean{
+            // Check if forge library is loaded. We do this because the library is huge and we dont want to package it together
+            if (typeof forge === "undefined"){
+                console.error("[iPushPull]", "If you want to use encryption make sure you include forge library in your header or use ng-ipushpull-standalone.min.js");
+            }
+
+            return typeof forge !== "undefined";
         }
     }
 
