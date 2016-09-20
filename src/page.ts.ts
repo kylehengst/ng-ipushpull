@@ -275,7 +275,8 @@ namespace ipushpull {
         decrypted: boolean;
         updatesOn: boolean;
 
-        encryptionKey: IEncryptionKey;
+        encryptionKeyPull: IEncryptionKey;
+        encryptionKeyPush: IEncryptionKey;
 
         data: IPage;
         access: IUserPageAccess;
@@ -322,7 +323,16 @@ namespace ipushpull {
         private _pageName: string;
         private _folderName: string;
 
-        private _encryptionKey: IEncryptionKey = {
+        // Ouch... but what else can I do....
+        private _contentLoaded: boolean;
+        private _metaLoaded: boolean;
+
+        private _encryptionKeyPull: IEncryptionKey = {
+            name: "",
+            passphrase: "",
+        };
+
+        private _encryptionKeyPush: IEncryptionKey = {
             name: "",
             passphrase: "",
         };
@@ -398,7 +408,8 @@ namespace ipushpull {
             }
         }
 
-        public set encryptionKey(key: IEncryptionKey){ this._encryptionKey = key; }
+        public set encryptionKeyPull(key: IEncryptionKey){ this._encryptionKeyPull = key; }
+        public set encryptionKeyPush(key: IEncryptionKey){ this._encryptionKeyPush = key; }
 
         public get data(): IPage{ return this._data; }
         public get access(): IUserPageAccess { return this._access; }
@@ -425,7 +436,7 @@ namespace ipushpull {
         public decrypt(key?: IEncryptionKey): void {
             // @todo Oh lord...
             if (!key){
-                key = this._encryptionKey;
+                key = this._encryptionKeyPull;
             }
 
             // Fail silently if we dont have passphrase
@@ -445,7 +456,7 @@ namespace ipushpull {
                 if (decrypted){
                     this.decrypted = true;
                     this._data.content = decrypted;
-                    this._encryptionKey = key;
+                    this._encryptionKeyPull = key;
 
                     // @todo Emitting Decrypted and New content events will lead to confusion. Eventually you will want to subscribe to both for rendering, so you will have double rendering
                     this.emit(this.EVENT_DECRYPTED);
@@ -558,11 +569,8 @@ namespace ipushpull {
 
                 this.decrypt();
 
-                // @todo Not a great logic - When do we consider for a page to actually be ready?
-                if (!this.ready){
-                    this.ready = true;
-                    this.emit(this.EVENT_READY);
-                }
+                this._contentLoaded = true;
+                this.checkReady();
 
                 // @todo This should be emitted before decryption probably
                 this.emit(this.EVENT_NEW_CONTENT, this._data);
@@ -577,6 +585,9 @@ namespace ipushpull {
 
                 this._data = angular.merge({}, this._data, data);
 
+                this._metaLoaded = true;
+                this.checkReady();
+
                 this.emit(this.EVENT_NEW_META, data);
             });
 
@@ -590,18 +601,18 @@ namespace ipushpull {
 
             // If encrypted
             if (this._data.encryption_type_to_use) {
-                if (!this._encryptionKey || this._data.encryption_key_to_use !== this._encryptionKey.name){
+                if (!this._encryptionKeyPull || this._data.encryption_key_to_use !== this._encryptionKeyPush.name){
                     // @todo Proper error
                     q.reject("None or wrong encryption key");
                     return q.promise;
                 }
 
-                let encrypted: string = this.encrypt(this._encryptionKey, content);
+                let encrypted: string = this.encrypt(this._encryptionKeyPush, content);
 
                 if (encrypted) {
                     this._data.encrypted_content = encrypted;
                     this._data.encryption_type_used = 1;
-                    this._data.encryption_key_used = this._encryptionKey.name;
+                    this._data.encryption_key_used = this._encryptionKeyPush.name;
                 } else {
                     // @todo proper error
                     q.reject("Encryption failed");
@@ -648,6 +659,14 @@ namespace ipushpull {
             api.savePageContentDelta(requestData).then(q.resolve, q.reject);
 
             return q.promise;
+        }
+
+        // @todo Not a great logic - When do we consider for a page to actually be ready?
+        private checkReady(): void {
+            if (this._contentLoaded && this._metaLoaded && !this.ready){
+                this.ready = true;
+                this.emit(this.EVENT_READY);
+            }
         }
 
         private updatePageType(pageType: number): number{

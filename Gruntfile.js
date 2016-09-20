@@ -29,7 +29,9 @@ module.exports = function(grunt){
             definition: {
                 dest: 'build/index.d.ts',
                 src: [
-                    'src/**/*.d.ts'
+                    'typings/globals/wolfy87-eventemitter/index.d.ts',
+                    'typings/globals/socket.io-client/index.d.ts',
+                    'src/**/*.d.ts',
                 ]
             }
         },

@@ -7912,7 +7912,11 @@ var ipushpull;
             this.decrypted = true;
             this.updatesOn = false;
             this._supportsWS = true;
-            this._encryptionKey = {
+            this._encryptionKeyPull = {
+                name: "",
+                passphrase: "",
+            };
+            this._encryptionKeyPush = {
                 name: "",
                 passphrase: "",
             };
@@ -8039,8 +8043,13 @@ var ipushpull;
             return q.promise;
         };
         ;
-        Object.defineProperty(Page.prototype, "encryptionKey", {
-            set: function (key) { this._encryptionKey = key; },
+        Object.defineProperty(Page.prototype, "encryptionKeyPull", {
+            set: function (key) { this._encryptionKeyPull = key; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page.prototype, "encryptionKeyPush", {
+            set: function (key) { this._encryptionKeyPush = key; },
             enumerable: true,
             configurable: true
         });
@@ -8073,7 +8082,7 @@ var ipushpull;
         };
         Page.prototype.decrypt = function (key) {
             if (!key) {
-                key = this._encryptionKey;
+                key = this._encryptionKeyPull;
             }
             if (this._data.encryption_type_used && !key.passphrase) {
                 this.decrypted = false;
@@ -8087,7 +8096,7 @@ var ipushpull;
                 if (decrypted) {
                     this.decrypted = true;
                     this._data.content = decrypted;
-                    this._encryptionKey = key;
+                    this._encryptionKeyPull = key;
                     this.emit(this.EVENT_DECRYPTED);
                 }
                 else {
@@ -8171,10 +8180,8 @@ var ipushpull;
                 data.special_page_type = _this.updatePageType(data.special_page_type);
                 _this._data = angular.merge({}, _this._data, data);
                 _this.decrypt();
-                if (!_this.ready) {
-                    _this.ready = true;
-                    _this.emit(_this.EVENT_READY);
-                }
+                _this._contentLoaded = true;
+                _this.checkReady();
                 _this.emit(_this.EVENT_NEW_CONTENT, _this._data);
             });
             this._provider.on("meta_update", function (data) {
@@ -8182,6 +8189,8 @@ var ipushpull;
                 delete data.content;
                 delete data.encrypted_content;
                 _this._data = angular.merge({}, _this._data, data);
+                _this._metaLoaded = true;
+                _this.checkReady();
                 _this.emit(_this.EVENT_NEW_META, data);
             });
             this._provider.on("error", function (err) {
@@ -8192,15 +8201,15 @@ var ipushpull;
             var _this = this;
             var q = $q.defer();
             if (this._data.encryption_type_to_use) {
-                if (!this._encryptionKey || this._data.encryption_key_to_use !== this._encryptionKey.name) {
+                if (!this._encryptionKeyPull || this._data.encryption_key_to_use !== this._encryptionKeyPush.name) {
                     q.reject("None or wrong encryption key");
                     return q.promise;
                 }
-                var encrypted = this.encrypt(this._encryptionKey, content);
+                var encrypted = this.encrypt(this._encryptionKeyPush, content);
                 if (encrypted) {
                     this._data.encrypted_content = encrypted;
                     this._data.encryption_type_used = 1;
-                    this._data.encryption_key_used = this._encryptionKey.name;
+                    this._data.encryption_key_used = this._encryptionKeyPush.name;
                 }
                 else {
                     q.reject("Encryption failed");
@@ -8238,6 +8247,12 @@ var ipushpull;
             };
             api.savePageContentDelta(requestData).then(q.resolve, q.reject);
             return q.promise;
+        };
+        Page.prototype.checkReady = function () {
+            if (this._contentLoaded && this._metaLoaded && !this.ready) {
+                this.ready = true;
+                this.emit(this.EVENT_READY);
+            }
         };
         Page.prototype.updatePageType = function (pageType) {
             if (pageType > 0 && pageType < 5 || pageType === 7) {
