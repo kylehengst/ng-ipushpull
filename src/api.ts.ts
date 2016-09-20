@@ -213,11 +213,14 @@ namespace ipushpull {
         public refreshAccessTokens(refreshToken: string): IPromise<IRequestResult>{
             return this.send(
                 Request.post(this._endPoint + "oauth/token/")
-                    .params({
+                    .data(this.$httpParamSerializerJQLike({
                         grant_type: "refresh_token",
                         client_id: this.config.api_key,
                         client_secret: this.config.api_secret,
                         refresh_token: refreshToken,
+                    }))
+                    .headers({
+                        "Content-Type": "application/x-www-form-urlencoded",
                     })
                     .overrideLock()
             );
@@ -553,7 +556,8 @@ namespace ipushpull {
 
                 let ippAuth: IAuthService = this.$injector.get<IAuthService>("ippAuthService");
 
-                // Attempt to re-log in
+                // Attempt to re-log in - no matter what the result is, resolve this promise - @todo cannot remember why?
+                console.log("Attempting to re-login");
                 ippAuth.authenticate().finally(() => {
                     // Unblock api again
                     console.log("Api is unlocked");

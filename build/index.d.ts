@@ -316,11 +316,12 @@ declare namespace ipushpull {
         EVENT_READY: string;
         EVENT_NEW_CONTENT: string;
         EVENT_NEW_META: string;
+        EVENT_DECRYPTED: string;
         EVENT_ERROR: string;
         ready: boolean;
         decrypted: boolean;
         updatesOn: boolean;
-        passphrase: string;
+        encryptionKey: IEncryptionKey;
         data: IPage;
         access: IUserPageAccess;
         start: () => void;

@@ -7397,6 +7397,7 @@ var ipushpull;
                     _this._locked = true;
                     _this.storage.remove("access_token");
                     var ippAuth = _this.$injector.get("ippAuthService");
+                    console.log("Attempting to re-login");
                     ippAuth.authenticate().finally(function () {
                         console.log("Api is unlocked");
                         _this._locked = false;
@@ -7445,11 +7446,14 @@ var ipushpull;
         };
         Api.prototype.refreshAccessTokens = function (refreshToken) {
             return this.send(Request.post(this._endPoint + "oauth/token/")
-                .params({
+                .data(this.$httpParamSerializerJQLike({
                 grant_type: "refresh_token",
                 client_id: this.config.api_key,
                 client_secret: this.config.api_secret,
                 refresh_token: refreshToken,
+            }))
+                .headers({
+                "Content-Type": "application/x-www-form-urlencoded",
             })
                 .overrideLock());
         };
@@ -7910,7 +7914,7 @@ var ipushpull;
             this._supportsWS = true;
             this._encryptionKey = {
                 name: "",
-                passphrase: ""
+                passphrase: "",
             };
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
             this._folderId = (!isNaN(+folderId)) ? folderId : undefined;
@@ -7975,6 +7979,11 @@ var ipushpull;
         });
         Object.defineProperty(Page.prototype, "EVENT_READY", {
             get: function () { return "ready"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Page.prototype, "EVENT_DECRYPTED", {
+            get: function () { return "decrypted"; },
             enumerable: true,
             configurable: true
         });
@@ -8067,6 +8076,7 @@ var ipushpull;
                 key = this._encryptionKey;
             }
             if (this._data.encryption_type_used && !key.passphrase) {
+                this.decrypted = false;
                 return;
             }
             if (this._data.encryption_type_used) {
@@ -8078,6 +8088,7 @@ var ipushpull;
                     this.decrypted = true;
                     this._data.content = decrypted;
                     this._encryptionKey = key;
+                    this.emit(this.EVENT_DECRYPTED);
                 }
                 else {
                     this.decrypted = false;
@@ -8164,7 +8175,7 @@ var ipushpull;
                     _this.ready = true;
                     _this.emit(_this.EVENT_READY);
                 }
-                _this.emit(_this.EVENT_NEW_CONTENT, data);
+                _this.emit(_this.EVENT_NEW_CONTENT, _this._data);
             });
             this._provider.on("meta_update", function (data) {
                 data.special_page_type = _this.updatePageType(data.special_page_type);

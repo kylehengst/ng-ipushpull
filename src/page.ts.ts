@@ -268,13 +268,14 @@ namespace ipushpull {
         EVENT_READY: string;
         EVENT_NEW_CONTENT: string;
         EVENT_NEW_META: string;
+        EVENT_DECRYPTED: string;
         EVENT_ERROR: string;
 
         ready: boolean;
         decrypted: boolean;
         updatesOn: boolean;
 
-        passphrase: string;
+        encryptionKey: IEncryptionKey;
 
         data: IPage;
         access: IUserPageAccess;
@@ -298,6 +299,7 @@ namespace ipushpull {
         public get TYPE_LIVE_USAGE_REPORT(): number { return 1007; }
 
         public get EVENT_READY(): string { return "ready"; }
+        public get EVENT_DECRYPTED(): string { return "decrypted"; }
         public get EVENT_NEW_CONTENT(): string { return "new_content"; }
         public get EVENT_NEW_META(): string { return "new_meta"; }
         public get EVENT_ACCESS_UPDATED(): string { return "access_updated"; }
@@ -429,6 +431,7 @@ namespace ipushpull {
             // Fail silently if we dont have passphrase
             // @todo oh sweet jesus...
             if (this._data.encryption_type_used && !key.passphrase){
+                this.decrypted = false;
                 return;
             }
 
@@ -443,16 +446,19 @@ namespace ipushpull {
                     this.decrypted = true;
                     this._data.content = decrypted;
                     this._encryptionKey = key;
+
+                    // @todo Emitting Decrypted and New content events will lead to confusion. Eventually you will want to subscribe to both for rendering, so you will have double rendering
+                    this.emit(this.EVENT_DECRYPTED);
                 } else {
                     this.decrypted = false;
-                    // I am pretty sure we will want something more specific for decryption than just message
+                    // @todo I am pretty sure we will want something more specific for decryption than just message
                     this.emit(this.EVENT_ERROR, new Error(`Could not decrypt page with key "${key.name}" and passphrase "${key.passphrase}"`));
                 }
             } else {
                 this.decrypted = true;
             }
 
-            // @todo ouch...
+            // @todo ouch... should not be here
             if (this.decrypted){
                 this._data.content = PageStyles.decompressStyles(this._data.content);
             }
@@ -559,7 +565,7 @@ namespace ipushpull {
                 }
 
                 // @todo This should be emitted before decryption probably
-                this.emit(this.EVENT_NEW_CONTENT, data);
+                this.emit(this.EVENT_NEW_CONTENT, this._data);
             });
 
             this._provider.on("meta_update", (data) => {
