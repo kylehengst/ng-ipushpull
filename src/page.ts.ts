@@ -445,7 +445,7 @@ namespace ipushpull {
 
             // Fail silently if we dont have passphrase
             // @todo oh sweet jesus...
-            if (this._data.encryption_type_used && !key.passphrase){ console.log("no pass");
+            if (this._data.encryption_type_used && !key.passphrase){
                 this.decrypted = false;
                 return;
             }
@@ -696,6 +696,108 @@ namespace ipushpull {
         private encrypt(key: IEncryptionKey, content: IPageContent): string {
             // @todo: Handle encryption error
             return crypto.encryptContent(key, content);
+        }
+    }
+
+    export interface IPageRangeItem {
+        name: string;
+        toObject: () => IPageRange;
+    }
+    
+    export interface IPagePermissionRange extends IPageRangeItem {
+        rowStart: number;
+        rowEnd: number;
+        colStart: number;
+        colEnd: number;
+
+        setPermission: (userId: number, permission: string) => void
+    }
+
+    export interface IPageFreezingRange extends IPageRangeItem {
+        subject: string;
+        count: number;
+    }
+
+    export class PermissionRange implements IPagePermissionRange {
+        // @todo Constants for permissions ro, no etc
+
+        private _permissions: IPageRangeRights;
+
+        constructor(public name: string, public rowStart: number = 0, public rowEnd: number = 0, public colStart: number = 0, public colEnd: number = 0){}
+        
+        public setPermission(userId: number, permission: string): void {
+            // First remove user rom all ranges
+            this._permissions.ro.splice(this._permissions.ro.indexOf(userId), 1);
+            this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
+
+            this._permissions[permission].push(userId);
+        }
+
+        public toObject(): IPageRange {
+            return {
+                name: this.name,
+                start: `${this.rowStart}:${this.colStart}`,
+                end: `${this.rowEnd}:${this.colEnd}`,
+                rights: this._permissions,
+                freeze: false,
+            };
+        }
+    }
+
+    export type TFreezeSubject = "rows" | "cols";
+
+    export class FreezingRange implements IPageRangeItem{
+        public static get SUBJECT_ROWS(): string { return "rows"; };
+        public static get SUBJECT_COLUMNS(): string { return "cols"; };
+
+        constructor(public name: string, public subject: TFreezeSubject = "rows", public count: number = 1){}
+
+        public toObject(): IPageRange {
+            let range: IPageRange = {
+                name: this.name,
+                start: "0:0",
+                end: "",
+                rights: {ro: [], no: []},
+                freeze: true,
+            };
+
+            if (this.subject === FreezingRange.SUBJECT_ROWS){
+                range.end = `${this.count - 1}:-1`;
+            } else {
+                range.end = `-1:${this.count - 1}`;
+            }
+
+            return range;
+        }
+    }
+
+    class Ranges {
+        private _ranges: IPageRangeItem[] = [];
+
+        constructor(pageAccessRights?: string){
+            if (pageAccessRights){
+                this.parse(pageAccessRights);
+            }
+        }
+
+        public parse(pageAccessRights: string): void {
+            let ar: IPageRange[] = JSON.parse(pageAccessRights);
+
+            for (let i: number = 0; i < ar.length; i++){
+                let rowStart: number = parseInt(ar[i].start.split(":")[0], 10);
+                let rowEnd: number = parseInt(ar[i].end.split(":")[0], 10);
+                let colStart: number = parseInt(ar[i].start.split(":")[1], 10);
+                let colEnd: number = parseInt(ar[i].end.split(":")[1], 10);
+
+                if (ar[i].freeze){
+                    let subject: TFreezeSubject = (colEnd >= 0) ? "cols" : "rows";
+                    let count: number = (colEnd >= 0) ? colEnd + 1 : rowEnd + 1;
+
+                    this._ranges.push(new FreezingRange(ar[i].name, subject, count));
+                } else {
+                    this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd));
+                }
+            }
         }
     }
 
