@@ -517,7 +517,7 @@ namespace ipushpull {
         }
 
         private dummyRequest = (data: any): IPromise<any> => {
-            // console.log("Api is locked down, preventing call " + data.url);
+            console.log("Api is locked down, preventing call " + data.url);
 
             let q: IDeferred<any> = this.$q.defer();
 
@@ -563,6 +563,11 @@ namespace ipushpull {
                 ippAuth.authenticate(true).finally(() => {
                     this._locked = false;
                     // console.log("Unblocking Api");
+                });
+
+                // Hacky, but not sure what other way around it...
+                ippAuth.on(ippAuth.EVENT_LOGGED_IN, () => {
+                    this._locked = false;
                 });
             }
 

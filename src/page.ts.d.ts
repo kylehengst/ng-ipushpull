@@ -213,6 +213,7 @@ declare namespace ipushpull {
     }
 }
 declare namespace ipushpull {
+    import IPromise = angular.IPromise;
     interface IPageRangeItem {
         name: string;
         toObject: () => IPageRange;
@@ -237,6 +238,7 @@ declare namespace ipushpull {
         private _permissions;
         constructor(name: string, rowStart?: number, rowEnd?: number, colStart?: number, colEnd?: number);
         setPermission(userId: number, permission: string): void;
+        getPermission(userId: number): string;
         toObject(): IPageRange;
     }
     type TFreezeSubject = "rows" | "cols";
@@ -248,5 +250,15 @@ declare namespace ipushpull {
         static SUBJECT_COLUMNS: string;
         constructor(name: string, subject?: TFreezeSubject, count?: number);
         toObject(): IPageRange;
+    }
+    interface IPageRangesCollection {
+        TYPE_PERMISSION_RANGE: string;
+        TYPE_FREEZING_RANGE: string;
+        ranges: IPageRangeItem[];
+        setRanges: (ranges: IPageRangeItem[]) => IPageRangesCollection;
+        addRange: (range: IPageRangeItem) => IPageRangesCollection;
+        removeRange: (range: IPageRangeItem) => IPageRangesCollection;
+        save: () => IPromise<any>;
+        parse: (pageAccessRights: string) => IPageRangeItem[];
     }
 }

@@ -13,7 +13,7 @@ namespace ipushpull {
 
         user: IUserSelf;
 
-        authenticate: (force: boolean) => IPromise<any>;
+        authenticate: (force?: boolean) => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
         logout: () => void;
     }
@@ -73,7 +73,9 @@ namespace ipushpull {
 
             this.processAuth().then((res) => {
                 this._authenticated = true;
+
                 this.emit(this.EVENT_LOGGED_IN);
+
                 q.resolve();
             }, (err) => {
                 this.emit(this.EVENT_ERROR, err);

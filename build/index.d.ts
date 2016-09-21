@@ -1249,10 +1249,9 @@ declare namespace ipushpull {
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
         user: IUserSelf;
-        authenticate: () => IPromise<any>;
+        authenticate: (force?: boolean) => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
         logout: () => void;
-        refreshTokens: () => IPromise<any>;
     }
     interface IUserSelf {
         id: number;
@@ -1291,11 +1290,14 @@ declare namespace ipushpull {
         api_key: string;
         api_secret: string;
         transport?: string;
+        storage_prefix?: string;
     }
     const module: IModule;
 }
 
 declare namespace ipushpull {
+    import IPromise = angular.IPromise;
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
     interface IPageContentLink {
         external: boolean;
         address: string;
@@ -1477,8 +1479,85 @@ declare namespace ipushpull {
     interface IPageCloneOptions {
         clone_ranges?: boolean;
     }
+    interface IPageService extends IEventEmitter {
+        TYPE_REGULAR: number;
+        TYPE_ALERT: number;
+        TYPE_PDF: number;
+        TYPE_PAGE_ACCESS_REPORT: number;
+        TYPE_DOMAIN_USAGE_REPORT: number;
+        TYPE_GLOBAL_USAGE_REPORT: number;
+        TYPE_PAGE_UPDATE_REPORT: number;
+        TYPE_LIVE_USAGE_REPORT: number;
+        EVENT_READY: string;
+        EVENT_NEW_CONTENT: string;
+        EVENT_NEW_META: string;
+        EVENT_DECRYPTED: string;
+        EVENT_ERROR: string;
+        ready: boolean;
+        decrypted: boolean;
+        updatesOn: boolean;
+        encryptionKeyPull: IEncryptionKey;
+        encryptionKeyPush: IEncryptionKey;
+        data: IPage;
+        access: IUserPageAccess;
+        Ranges: any;
+        start: () => void;
+        stop: () => void;
+        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
+        destroy: () => void;
+        decrypt: (key: IEncryptionKey) => void;
+        clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
+    }
 }
 declare namespace ipushpull {
+    import IPromise = angular.IPromise;
+    interface IPageRangeItem {
+        name: string;
+        toObject: () => IPageRange;
+    }
+    interface IPagePermissionRange extends IPageRangeItem {
+        rowStart: number;
+        rowEnd: number;
+        colStart: number;
+        colEnd: number;
+        setPermission: (userId: number, permission: string) => void;
+    }
+    interface IPageFreezingRange extends IPageRangeItem {
+        subject: string;
+        count: number;
+    }
+    class PermissionRange implements IPagePermissionRange {
+        name: string;
+        rowStart: number;
+        rowEnd: number;
+        colStart: number;
+        colEnd: number;
+        private _permissions;
+        constructor(name: string, rowStart?: number, rowEnd?: number, colStart?: number, colEnd?: number);
+        setPermission(userId: number, permission: string): void;
+        getPermission(userId: number): string;
+        toObject(): IPageRange;
+    }
+    type TFreezeSubject = "rows" | "cols";
+    class FreezingRange implements IPageRangeItem {
+        name: string;
+        subject: TFreezeSubject;
+        count: number;
+        static SUBJECT_ROWS: string;
+        static SUBJECT_COLUMNS: string;
+        constructor(name: string, subject?: TFreezeSubject, count?: number);
+        toObject(): IPageRange;
+    }
+    interface IPageRangesCollection {
+        TYPE_PERMISSION_RANGE: string;
+        TYPE_FREEZING_RANGE: string;
+        ranges: IPageRangeItem[];
+        setRanges: (ranges: IPageRangeItem[]) => IPageRangesCollection;
+        addRange: (range: IPageRangeItem) => IPageRangesCollection;
+        removeRange: (range: IPageRangeItem) => IPageRangesCollection;
+        save: () => IPromise<any>;
+        parse: (pageAccessRights: string) => IPageRangeItem[];
+    }
 }
 
 declare namespace ipushpull {

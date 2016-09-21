@@ -394,8 +394,6 @@ namespace ipushpull {
             this._folderName = (isNaN(+folderId)) ? <string>folderId : undefined;
             this._pageName = (isNaN(+pageId)) ? <string>pageId : undefined;
 
-            this.Ranges = new Ranges();
-
             // If we dont have page id, cannot start autopulling
             // @todo Should we emit some error to user?
             if (!this._pageId){
@@ -522,6 +520,8 @@ namespace ipushpull {
         }
 
         private init(autoStart: boolean = true): void{
+            this.Ranges = new Ranges(this._folderId, this._pageId);
+
             if (!this._supportsWS || typeof io === "undefined"){
                 console.warn("[iPushPull] Cannot use websocket technology it is not supported or websocket library is not included. " +
                     "Make sure socket-io client is incldued or use ng-ipushpull-standalone.min.js");
@@ -730,8 +730,10 @@ namespace ipushpull {
 
     export class PermissionRange implements IPagePermissionRange {
         // @todo Constants for permissions ro, no etc
-
-        private _permissions: IPageRangeRights;
+        private _permissions: IPageRangeRights = {
+            ro: [],
+            no: [],
+        };
 
         constructor(public name: string, public rowStart: number = 0, public rowEnd: number = 0, public colStart: number = 0, public colEnd: number = 0){}
         
@@ -741,6 +743,18 @@ namespace ipushpull {
             this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
 
             this._permissions[permission].push(userId);
+        }
+
+        public getPermission(userId: number): string {
+            let permission: string = "";
+
+            if (this._permissions.ro.indexOf(userId) >= 0){
+                permission = "ro";
+            } else if (this._permissions.no.indexOf(userId) >= 0) {
+                permission = "no";
+            }
+
+            return permission;
         }
 
         public toObject(): IPageRange {
@@ -781,17 +795,97 @@ namespace ipushpull {
         }
     }
 
-    class Ranges {
+    export interface IPageRangesCollection {
+        TYPE_PERMISSION_RANGE: string;
+        TYPE_FREEZING_RANGE: string;
+        ranges: IPageRangeItem[];
+        setRanges: (ranges: IPageRangeItem[]) => IPageRangesCollection;
+        addRange: (range: IPageRangeItem) => IPageRangesCollection;
+        removeRange: (range: IPageRangeItem) => IPageRangesCollection;
+        save: () => IPromise<any>;
+        parse: (pageAccessRights: string) => IPageRangeItem[];
+    }
+
+    class Ranges implements IPageRangesCollection {
         private _ranges: IPageRangeItem[] = [];
 
-        constructor(pageAccessRights?: string){
+        private _folderId: number;
+        private _pageId: number;
+
+        public get TYPE_PERMISSION_RANGE(): string { return "permissions"; }
+        public get TYPE_FREEZING_RANGE(): string { return "freezing"; }
+
+        public get ranges(): IPageRangeItem[] { return this._ranges; }
+
+        constructor(folderId: number, pageId: number, pageAccessRights?: string){
+            this._folderId = folderId;
+            this._pageId = pageId;
+
             if (pageAccessRights){
                 this.parse(pageAccessRights);
             }
         }
 
-        public parse(pageAccessRights: string): void {
+        public setRanges(ranges: IPageRangeItem[]): IPageRangesCollection {
+            this._ranges = ranges;
+
+            return this;
+        }
+
+        public addRange(range: IPageRangeItem): IPageRangesCollection {
+            // Prevent duplicates
+            let nameUnique: boolean = false;
+            let newName: string = range.name;
+            let count: number = 1;
+
+            while (!nameUnique){
+                nameUnique = true;
+
+                for (let i: number = 0; i < this._ranges.length; i++){
+                    if (this._ranges[i].name === newName){
+                        nameUnique = false;
+                        newName = range.name + "_" + count;
+                        count++;
+                    }
+                }
+            }
+
+            range.name = newName;
+
+            this._ranges.push(range);
+
+            return this;
+        }
+
+        public removeRange(range: IPageRangeItem): IPageRangesCollection {
+            this._ranges.splice(this._ranges.indexOf(range), 1);
+
+            return this;
+        }
+
+        public save(): IPromise<any> {
+            let ranges: IPageRange[] = [];
+
+            // Convert all ranges to objects
+            for (let i: number = 0; i < this._ranges.length; i++){
+                ranges.push(this._ranges[i].toObject());
+            }
+
+            let requestData: any = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: {
+                    access_rights: JSON.stringify(ranges),
+                },
+            };
+
+            return api.savePageSettings(requestData);
+        }
+
+        public parse(pageAccessRights: string): IPageRangeItem[] {
             let ar: IPageRange[] = JSON.parse(pageAccessRights);
+
+            this._ranges = [];
 
             for (let i: number = 0; i < ar.length; i++){
                 let rowStart: number = parseInt(ar[i].start.split(":")[0], 10);
@@ -808,6 +902,8 @@ namespace ipushpull {
                     this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd));
                 }
             }
+
+            return this._ranges;
         }
     }
 
@@ -957,8 +1053,29 @@ namespace ipushpull {
             }
         }
 
-        // @todo Will be done better
+        // This is really just for content
         public start(): void {
+            if (!this._socket || !this._socket.connected){
+                this.init();
+            } else {
+                this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_CONTENT, this.onPageContent);
+            }
+        }
+
+        // @todo Disconnecting socket on stop might be too wasteful. Better just throw away updates? or is that wasteful?
+        public stop(): void {
+            // this._socket.disconnect();
+            this._socket.off(ProviderSocket.SOCKET_EVENT_PAGE_CONTENT, this.onPageContent);
+
+            this._stopped = true;
+        }
+
+        public destroy(): void {
+            this.stop();
+            this.removeEvent();
+        }
+
+        private init(): void {
             // Connect to socket
             this._socket = this.connect();
 
@@ -976,18 +1093,6 @@ namespace ipushpull {
             });
 
             this._stopped = false;
-        }
-
-        // @todo Disconnecting socket on stop might be too wasteful. Better just throw away updates? or is that wasteful?
-        public stop(): void {
-            this._socket.disconnect();
-
-            this._stopped = true;
-        }
-
-        public destroy(): void {
-            this.stop();
-            this.removeEvent();
         }
 
         private connect(): Socket {
@@ -1025,7 +1130,7 @@ namespace ipushpull {
         private onPageError = (data: any): void => {
             $timeout(() => {
                 if (data.code === 401){
-                    auth.authenticate().then(() => {
+                    auth.authenticate(true).then(() => {
                         this.start();
                     });
                 } else {

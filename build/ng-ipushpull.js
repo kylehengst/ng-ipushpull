@@ -128,6 +128,7 @@ var ipushpull;
                     data: {},
                     status: 666,
                     statusText: "Api is locked",
+                    config: data,
                 });
                 return q.promise;
             };
@@ -148,10 +149,11 @@ var ipushpull;
                     _this.storage.remove("access_token");
                     var ippAuth = _this.$injector.get("ippAuthService");
                     console.log("Attempting to re-login");
-                    ippAuth.authenticate().finally(function () {
-                        console.log("Api is unlocked");
+                    ippAuth.authenticate(true).finally(function () {
                         _this._locked = false;
-                        q.resolve();
+                    });
+                    ippAuth.on(ippAuth.EVENT_LOGGED_IN, function () {
+                        _this._locked = false;
                     });
                 }
                 q.reject({
@@ -434,6 +436,7 @@ var ipushpull;
             this.config = config;
             this._user = {};
             this._authenticated = false;
+            this._authInProgress = false;
         }
         Object.defineProperty(Auth.prototype, "EVENT_LOGGED_IN", {
             get: function () { return "logged_in"; },
@@ -460,50 +463,32 @@ var ipushpull;
             enumerable: true,
             configurable: true
         });
-        Auth.prototype.authenticate = function () {
+        Auth.prototype.authenticate = function (force) {
             var _this = this;
+            if (force === void 0) { force = false; }
             var q = this.$q.defer();
-            if (this._authenticated) {
+            if (this._authInProgress) {
+                q.reject("Auth already in progress");
+                return q.promise;
+            }
+            this._authInProgress = true;
+            if (this._authenticated && !force) {
+                this._authInProgress = false;
                 q.resolve();
                 return q.promise;
             }
-            if (this.storage.get("access_token")) {
-                this.getUserInfo().then(function () {
-                    _this._authenticated = true;
-                    _this.emit(_this.EVENT_LOGGED_IN);
-                    q.resolve();
-                }, function (err) {
-                    _this._authenticated = false;
-                    _this.emit(_this.EVENT_ERROR, err);
-                    q.reject(err);
-                });
-            }
-            else if (this.storage.get("refresh_token")) {
-                return this.refreshTokens();
-            }
-            else {
-                this._authenticated = false;
-                q.reject("No tokens available");
-            }
-            return q.promise;
-        };
-        Auth.prototype.refreshTokens = function () {
-            var _this = this;
-            var q = this.$q.defer();
-            var refreshToken = this.storage.get("refresh_token");
-            if (!refreshToken) {
-                this.logout();
-                q.reject();
-                return q.promise;
-            }
-            this.emit(this.EVENT_RE_LOGGING);
-            this.ippApi.refreshAccessTokens(refreshToken).then(function (res) {
-                _this.storage.create("access_token", res.data.access_token);
-                _this.storage.create("refresh_token", res.data.refresh_token);
-                _this.authenticate().then(q.resolve, q.reject);
+            this.processAuth().then(function (res) {
+                _this._authenticated = true;
+                _this.emit(_this.EVENT_LOGGED_IN);
+                q.resolve();
             }, function (err) {
                 _this.emit(_this.EVENT_ERROR, err);
+                if (_this._authenticated) {
+                    _this.logout();
+                }
                 q.reject(err);
+            }).finally(function () {
+                _this._authInProgress = false;
             });
             return q.promise;
         };
@@ -517,8 +502,7 @@ var ipushpull;
                 email: username,
                 password: password,
             }).then(function (res) {
-                _this.storage.create("access_token", res.data.access_token);
-                _this.storage.create("refresh_token", res.data.refresh_token);
+                _this.saveTokens(res.data);
                 _this.authenticate().then(q.resolve, q.reject);
             }, function (err) {
                 err.message = "";
@@ -544,10 +528,43 @@ var ipushpull;
             return q.promise;
         };
         Auth.prototype.logout = function () {
-            this.emit(this.EVENT_LOGGED_OUT);
             this.storage.remove("access_token");
             this.storage.remove("refresh_token");
             this._authenticated = false;
+            this.emit(this.EVENT_LOGGED_OUT);
+        };
+        Auth.prototype.processAuth = function () {
+            var _this = this;
+            var q = this.$q.defer();
+            var accessToken = this.storage.get("access_token");
+            var refreshToken = this.storage.get("refresh_token");
+            if (accessToken) {
+                return this.getUserInfo();
+            }
+            else {
+                if (refreshToken) {
+                    this.refreshTokens().then(function (data) {
+                        _this.saveTokens(data.data);
+                        _this.getUserInfo().then(q.resolve, q.reject);
+                    }, function (err) {
+                        _this.storage.remove("refresh_token");
+                        q.reject(err);
+                    });
+                }
+                else {
+                    q.reject("No tokens available");
+                }
+            }
+            return q.promise;
+        };
+        Auth.prototype.refreshTokens = function () {
+            var refreshToken = this.storage.get("refresh_token");
+            this.emit(this.EVENT_RE_LOGGING);
+            return this.ippApi.refreshAccessTokens(refreshToken);
+        };
+        Auth.prototype.saveTokens = function (tokens) {
+            this.storage.create("access_token", tokens.access_token);
+            this.storage.create("refresh_token", tokens.refresh_token);
         };
         Auth.prototype.getUserInfo = function () {
             var _this = this;
@@ -555,9 +572,7 @@ var ipushpull;
             this.ippApi.getSelfInfo().then(function (res) {
                 _this._user = res.data;
                 q.resolve();
-            }, function (err) {
-                q.reject(err);
-            });
+            }, q.reject);
             return q.promise;
         };
         Auth.$inject = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
@@ -848,7 +863,6 @@ var ipushpull;
                 key = this._encryptionKeyPull;
             }
             if (this._data.encryption_type_used && !key.passphrase) {
-                console.log("no pass");
                 this.decrypted = false;
                 return;
             }
@@ -905,6 +919,7 @@ var ipushpull;
         Page.prototype.init = function (autoStart) {
             var _this = this;
             if (autoStart === void 0) { autoStart = true; }
+            this.Ranges = new Ranges(this._folderId, this._pageId);
             if (!this._supportsWS || typeof io === "undefined") {
                 console.warn("[iPushPull] Cannot use websocket technology it is not supported or websocket library is not included. " +
                     "Make sure socket-io client is incldued or use ng-ipushpull-standalone.min.js");
@@ -957,6 +972,7 @@ var ipushpull;
                 delete data.content;
                 delete data.encrypted_content;
                 _this._data = angular.merge({}, _this._data, data);
+                _this.Ranges.parse(data.access_rights || "[]");
                 _this._metaLoaded = true;
                 _this.checkReady();
                 _this.emit(_this.EVENT_NEW_META, data);
@@ -1038,6 +1054,174 @@ var ipushpull;
         };
         return Page;
     }(EventEmitter));
+    var PermissionRange = (function () {
+        function PermissionRange(name, rowStart, rowEnd, colStart, colEnd) {
+            if (rowStart === void 0) { rowStart = 0; }
+            if (rowEnd === void 0) { rowEnd = 0; }
+            if (colStart === void 0) { colStart = 0; }
+            if (colEnd === void 0) { colEnd = 0; }
+            this.name = name;
+            this.rowStart = rowStart;
+            this.rowEnd = rowEnd;
+            this.colStart = colStart;
+            this.colEnd = colEnd;
+            this._permissions = {
+                ro: [],
+                no: [],
+            };
+        }
+        PermissionRange.prototype.setPermission = function (userId, permission) {
+            this._permissions.ro.splice(this._permissions.ro.indexOf(userId), 1);
+            this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
+            this._permissions[permission].push(userId);
+        };
+        PermissionRange.prototype.getPermission = function (userId) {
+            var permission = "";
+            if (this._permissions.ro.indexOf(userId) >= 0) {
+                permission = "ro";
+            }
+            else if (this._permissions.no.indexOf(userId) >= 0) {
+                permission = "no";
+            }
+            return permission;
+        };
+        PermissionRange.prototype.toObject = function () {
+            return {
+                name: this.name,
+                start: this.rowStart + ":" + this.colStart,
+                end: this.rowEnd + ":" + this.colEnd,
+                rights: this._permissions,
+                freeze: false,
+            };
+        };
+        return PermissionRange;
+    }());
+    ipushpull.PermissionRange = PermissionRange;
+    var FreezingRange = (function () {
+        function FreezingRange(name, subject, count) {
+            if (subject === void 0) { subject = "rows"; }
+            if (count === void 0) { count = 1; }
+            this.name = name;
+            this.subject = subject;
+            this.count = count;
+        }
+        Object.defineProperty(FreezingRange, "SUBJECT_ROWS", {
+            get: function () { return "rows"; },
+            enumerable: true,
+            configurable: true
+        });
+        ;
+        Object.defineProperty(FreezingRange, "SUBJECT_COLUMNS", {
+            get: function () { return "cols"; },
+            enumerable: true,
+            configurable: true
+        });
+        ;
+        FreezingRange.prototype.toObject = function () {
+            var range = {
+                name: this.name,
+                start: "0:0",
+                end: "",
+                rights: { ro: [], no: [] },
+                freeze: true,
+            };
+            if (this.subject === FreezingRange.SUBJECT_ROWS) {
+                range.end = (this.count - 1) + ":-1";
+            }
+            else {
+                range.end = "-1:" + (this.count - 1);
+            }
+            return range;
+        };
+        return FreezingRange;
+    }());
+    ipushpull.FreezingRange = FreezingRange;
+    var Ranges = (function () {
+        function Ranges(folderId, pageId, pageAccessRights) {
+            this._ranges = [];
+            this._folderId = folderId;
+            this._pageId = pageId;
+            if (pageAccessRights) {
+                this.parse(pageAccessRights);
+            }
+        }
+        Object.defineProperty(Ranges.prototype, "TYPE_PERMISSION_RANGE", {
+            get: function () { return "permissions"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Ranges.prototype, "TYPE_FREEZING_RANGE", {
+            get: function () { return "freezing"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Ranges.prototype, "ranges", {
+            get: function () { return this._ranges; },
+            enumerable: true,
+            configurable: true
+        });
+        Ranges.prototype.setRanges = function (ranges) {
+            this._ranges = ranges;
+            return this;
+        };
+        Ranges.prototype.addRange = function (range) {
+            var nameUnique = false;
+            var newName = range.name;
+            var count = 1;
+            while (!nameUnique) {
+                console.log(newName);
+                nameUnique = true;
+                for (var i = 0; i < this._ranges.length; i++) {
+                    if (this._ranges[i].name === newName) {
+                        nameUnique = false;
+                        newName = range.name + "_" + count;
+                        count++;
+                    }
+                }
+            }
+            range.name = newName;
+            this._ranges.push(range);
+            return this;
+        };
+        Ranges.prototype.removeRange = function (range) {
+            this._ranges.splice(this._ranges.indexOf(range), 1);
+            return this;
+        };
+        Ranges.prototype.save = function () {
+            var ranges = [];
+            for (var i = 0; i < this._ranges.length; i++) {
+                ranges.push(this._ranges[i].toObject());
+            }
+            var requestData = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: {
+                    access_rights: JSON.stringify(ranges),
+                },
+            };
+            return api.savePageSettings(requestData);
+        };
+        Ranges.prototype.parse = function (pageAccessRights) {
+            var ar = JSON.parse(pageAccessRights);
+            this._ranges = [];
+            for (var i = 0; i < ar.length; i++) {
+                var rowStart = parseInt(ar[i].start.split(":")[0], 10);
+                var rowEnd = parseInt(ar[i].end.split(":")[0], 10);
+                var colStart = parseInt(ar[i].start.split(":")[1], 10);
+                var colEnd = parseInt(ar[i].end.split(":")[1], 10);
+                if (ar[i].freeze) {
+                    var subject = (colEnd >= 0) ? "cols" : "rows";
+                    var count = (colEnd >= 0) ? colEnd + 1 : rowEnd + 1;
+                    this._ranges.push(new FreezingRange(ar[i].name, subject, count));
+                }
+                else {
+                    this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd));
+                }
+            }
+            return this._ranges;
+        };
+        return Ranges;
+    }());
     var ProviderREST = (function (_super) {
         __extends(ProviderREST, _super);
         function ProviderREST(_pageId, _folderId, autoStart) {
@@ -1157,7 +1341,7 @@ var ipushpull;
             this.onPageError = function (data) {
                 $timeout(function () {
                     if (data.code === 401) {
-                        auth.refreshTokens().then(function () {
+                        auth.authenticate(true).then(function () {
                             _this.start();
                         });
                     }
@@ -1209,6 +1393,22 @@ var ipushpull;
             configurable: true
         });
         ProviderSocket.prototype.start = function () {
+            if (!this._socket || !this._socket.connected) {
+                this.init();
+            }
+            else {
+                this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_CONTENT, this.onPageContent);
+            }
+        };
+        ProviderSocket.prototype.stop = function () {
+            this._socket.off(ProviderSocket.SOCKET_EVENT_PAGE_CONTENT, this.onPageContent);
+            this._stopped = true;
+        };
+        ProviderSocket.prototype.destroy = function () {
+            this.stop();
+            this.removeEvent();
+        };
+        ProviderSocket.prototype.init = function () {
             this._socket = this.connect();
             this._socket.on("connect", this.onConnect);
             this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_CONTENT, this.onPageContent);
@@ -1219,14 +1419,6 @@ var ipushpull;
                 return;
             });
             this._stopped = false;
-        };
-        ProviderSocket.prototype.stop = function () {
-            this._socket.disconnect();
-            this._stopped = true;
-        };
-        ProviderSocket.prototype.destroy = function () {
-            this.stop();
-            this.removeEvent();
         };
         ProviderSocket.prototype.connect = function () {
             var query = [
@@ -1424,15 +1616,22 @@ var ipushpull;
         };
         return LocalStorage;
     }());
-    ipushpull.module.service("ippUserStorageService", ["ippAuthService", function (ippAuth) {
+    ipushpull.module.service("ippUserStorageService", ["ippAuthService", "ipushpull_conf", function (ippAuth, config) {
             var storage = new LocalStorage();
             storage.suffix = "GUEST";
+            if (config.storage_prefix) {
+                storage.prefix = config.storage_prefix;
+            }
             ippAuth.on("logged_in", function () {
                 storage.suffix = "" + ippAuth.user.id;
             });
             return storage;
         }]);
-    ipushpull.module.service("ippGlobalStorageService", [function () {
-            return new LocalStorage();
+    ipushpull.module.service("ippGlobalStorageService", ["ipushpull_conf", function (config) {
+            var storage = new LocalStorage();
+            if (config.storage_prefix) {
+                storage.prefix = config.storage_prefix;
+            }
+            return storage;
         }]);
 })(ipushpull || (ipushpull = {}));
