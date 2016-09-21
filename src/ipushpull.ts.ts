@@ -8,6 +8,7 @@ namespace ipushpull {
         api_key: string;
         api_secret: string;
         transport?: string;
+        storage_prefix?: string;
     }
 
     export const module: IModule = angular.module("ipushpull", []);

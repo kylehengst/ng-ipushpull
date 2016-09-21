@@ -517,7 +517,7 @@ namespace ipushpull {
         }
 
         private dummyRequest = (data: any): IPromise<any> => {
-            console.log("Api is locked down, preventing call " + data.url);
+            // console.log("Api is locked down, preventing call " + data.url);
 
             let q: IDeferred<any> = this.$q.defer();
 
@@ -525,6 +525,7 @@ namespace ipushpull {
                 data: {},
                 status: 666,
                 statusText: "Api is locked",
+                config: data,
             });
 
             return q.promise;
@@ -558,11 +559,10 @@ namespace ipushpull {
 
                 // Attempt to re-log in - no matter what the result is, resolve this promise - @todo cannot remember why?
                 console.log("Attempting to re-login");
-                ippAuth.authenticate().finally(() => {
-                    // Unblock api again
-                    console.log("Api is unlocked");
+
+                ippAuth.authenticate(true).finally(() => {
                     this._locked = false;
-                    q.resolve();
+                    // console.log("Unblocking Api");
                 });
             }
 

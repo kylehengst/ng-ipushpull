@@ -191,8 +191,6 @@ namespace ipushpull {
     }
 
     class LocalStorage implements IStorageService{
-        // public static $inject: string[] = [];
-
         public prefix: string = "ipp";
         public suffix: string;
 
@@ -245,9 +243,13 @@ namespace ipushpull {
         }
     }
 
-    ipushpull.module.service("ippUserStorageService", ["ippAuthService", (ippAuth: IAuthService) => {
+    ipushpull.module.service("ippUserStorageService", ["ippAuthService", "ipushpull_conf", (ippAuth: IAuthService, config: IIPPConfig) => {
         let storage: IStorageService =  new LocalStorage();
         storage.suffix = "GUEST";
+
+        if (config.storage_prefix){
+            storage.prefix = config.storage_prefix;
+        }
 
         ippAuth.on("logged_in", () => {
             storage.suffix = `${ippAuth.user.id}`;
@@ -256,7 +258,13 @@ namespace ipushpull {
         return storage;
     }]);
 
-    ipushpull.module.service("ippGlobalStorageService", [() => {
-        return new LocalStorage();
+    ipushpull.module.service("ippGlobalStorageService", ["ipushpull_conf", (config: IIPPConfig) => {
+        let storage: IStorageService =  new LocalStorage();
+
+        if (config.storage_prefix){
+            storage.prefix = config.storage_prefix;
+        }
+
+        return storage;
     }]);
 }

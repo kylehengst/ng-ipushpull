@@ -7,10 +7,9 @@ declare namespace ipushpull {
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
         user: IUserSelf;
-        authenticate: () => IPromise<any>;
+        authenticate: (force: boolean) => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
         logout: () => void;
-        refreshTokens: () => IPromise<any>;
     }
     interface IUserSelf {
         id: number;

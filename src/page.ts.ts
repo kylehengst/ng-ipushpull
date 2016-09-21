@@ -9,6 +9,8 @@
 // Interfaces - separating for easier IDE collapsing
 namespace ipushpull {
     "use strict";
+    import IPromise = angular.IPromise;
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
 
     export interface IPageContentLink {
         external: boolean;
@@ -236,6 +238,7 @@ namespace ipushpull {
 
         data: IPage;
         access: IUserPageAccess;
+        Ranges;
 
         start: () => void;
         stop: () => void;
@@ -314,6 +317,8 @@ namespace ipushpull {
         public decrypted: boolean = true;
         public updatesOn: boolean = false; // @todo I dont like this...
 
+        public Ranges;
+
         private _supportsWS: boolean = true; // let's be optimistic by default
         private _provider: IPageProvider;
 
@@ -388,6 +393,8 @@ namespace ipushpull {
             this._pageId = (!isNaN(+pageId)) ? <number>pageId : undefined;
             this._folderName = (isNaN(+folderId)) ? <string>folderId : undefined;
             this._pageName = (isNaN(+pageId)) ? <string>pageId : undefined;
+
+            this.Ranges = new Ranges();
 
             // If we dont have page id, cannot start autopulling
             // @todo Should we emit some error to user?
@@ -593,6 +600,9 @@ namespace ipushpull {
                 delete data.encrypted_content;
 
                 this._data = angular.merge({}, this._data, data);
+
+                // Process ranges
+                this.Ranges.parse(data.access_rights || "[]");
 
                 this._metaLoaded = true;
                 this.checkReady();
@@ -1015,7 +1025,7 @@ namespace ipushpull {
         private onPageError = (data: any): void => {
             $timeout(() => {
                 if (data.code === 401){
-                    auth.refreshTokens().then(() => {
+                    auth.authenticate().then(() => {
                         this.start();
                     });
                 } else {

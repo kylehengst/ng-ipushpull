@@ -13,10 +13,9 @@ namespace ipushpull {
 
         user: IUserSelf;
 
-        authenticate: () => IPromise<any>;
+        authenticate: (force: boolean) => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
         logout: () => void;
-        refreshTokens: () => IPromise<any>;
     }
 
     export interface IUserSelf {
@@ -47,6 +46,7 @@ namespace ipushpull {
 
         private _user: IUserSelf | any = {};
         private _authenticated: boolean = false;
+        private _authInProgress: boolean = false;
 
         public get user(): IUserSelf { return this._user; }
 
@@ -55,55 +55,36 @@ namespace ipushpull {
         }
 
         // @todo better name?
-        public authenticate(): IPromise<any>{
+        public authenticate(force: boolean = false): IPromise<any>{
             let q: IDeferred<any> = this.$q.defer();
 
-            if (this._authenticated){
+            if (this._authInProgress){
+                q.reject("Auth already in progress"); // @todo or resolve?
+                return q.promise;
+            }
+
+            this._authInProgress = true;
+
+            if (this._authenticated && !force){
+                this._authInProgress = false;
+                q.resolve(); // Actually at this moment we have no idea if access token is valid but we dont have to worry about that because of the 401 process from API
+                return q.promise;
+            }
+
+            this.processAuth().then((res) => {
+                this._authenticated = true;
+                this.emit(this.EVENT_LOGGED_IN);
                 q.resolve();
-                return q.promise;
-            }
-
-            if (this.storage.get("access_token")){
-                this.getUserInfo().then(() => {
-                    this._authenticated = true;
-                    this.emit(this.EVENT_LOGGED_IN); // @todo Actually at this moment we have no idea if access token is valid
-                    q.resolve();
-                }, (err) => {
-                    this._authenticated = false;
-                    this.emit(this.EVENT_ERROR, err);
-                    q.reject(err);
-                });
-            } else if (this.storage.get("refresh_token")) {
-                return this.refreshTokens();
-            } else {
-                this._authenticated = false;
-                q.reject("No tokens available");
-            }
-
-            return q.promise;
-        }
-
-        public refreshTokens(): IPromise<any> {
-            let q: IDeferred<any> = this.$q.defer();
-
-            let refreshToken: string = this.storage.get("refresh_token");
-
-            if (!refreshToken){
-                this.logout();
-                q.reject();
-                return q.promise;
-            }
-
-            this.emit(this.EVENT_RE_LOGGING); // @todo do we need this?
-
-            this.ippApi.refreshAccessTokens(refreshToken).then((res) => {
-                this.storage.create("access_token", res.data.access_token);
-                this.storage.create("refresh_token", res.data.refresh_token);
-
-                this.authenticate().then(q.resolve, q.reject);
             }, (err) => {
                 this.emit(this.EVENT_ERROR, err);
+
+                if (this._authenticated){
+                    this.logout();
+                }
+
                 q.reject(err);
+            }).finally(() => {
+                this._authInProgress = false;
             });
 
             return q.promise;
@@ -120,9 +101,7 @@ namespace ipushpull {
                 email: username,
                 password: password,
             }).then((res) => {
-                this.storage.create("access_token", res.data.access_token);
-                this.storage.create("refresh_token", res.data.refresh_token);
-
+                this.saveTokens(res.data);
                 this.authenticate().then(q.resolve, q.reject);
             }, (err) => {
                 err.message = "";
@@ -151,12 +130,50 @@ namespace ipushpull {
         }
 
         public logout(): void{
-            this.emit(this.EVENT_LOGGED_OUT);
-
             this.storage.remove("access_token");
             this.storage.remove("refresh_token");
 
             this._authenticated = false;
+
+            this.emit(this.EVENT_LOGGED_OUT);
+        }
+
+        private processAuth(): IPromise<any> {
+            let q: IDeferred<any> = this.$q.defer();
+
+            let accessToken: string = this.storage.get("access_token");
+            let refreshToken: string = this.storage.get("refresh_token");
+
+            if (accessToken){
+                 return this.getUserInfo();
+            } else {
+                if (refreshToken){
+                    this.refreshTokens().then((data) => {
+                        this.saveTokens(data.data);
+                        this.getUserInfo().then(q.resolve, q.reject);
+                    }, (err) => {
+                        this.storage.remove("refresh_token");
+                        q.reject(err);
+                    });
+                } else {
+                    q.reject("No tokens available");
+                }
+            }
+
+            return q.promise;
+        }
+
+        private refreshTokens(): IPromise<any> {
+            let refreshToken: string = this.storage.get("refresh_token");
+
+            this.emit(this.EVENT_RE_LOGGING); // @todo do we need this?
+
+            return this.ippApi.refreshAccessTokens(refreshToken);
+        }
+
+        private saveTokens(tokens: any): void {
+            this.storage.create("access_token", tokens.access_token);
+            this.storage.create("refresh_token", tokens.refresh_token);
         }
 
         private getUserInfo(): IPromise<IUserSelf> {
@@ -165,9 +182,7 @@ namespace ipushpull {
             this.ippApi.getSelfInfo().then((res) => {
                 this._user = res.data; // going outside function scope..
                 q.resolve();
-            }, (err) => {
-                q.reject(err);
-            });
+            }, q.reject);
 
             return q.promise;
         }
