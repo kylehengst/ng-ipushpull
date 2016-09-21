@@ -1520,7 +1520,8 @@ declare namespace ipushpull {
         rowEnd: number;
         colStart: number;
         colEnd: number;
-        setPermission: (userId: number, permission: string) => void;
+        setPermission: (userId: number, permission?: string) => void;
+        getPermission: (userId: number) => string;
     }
     interface IPageFreezingRange extends IPageRangeItem {
         subject: string;
@@ -1533,8 +1534,8 @@ declare namespace ipushpull {
         colStart: number;
         colEnd: number;
         private _permissions;
-        constructor(name: string, rowStart?: number, rowEnd?: number, colStart?: number, colEnd?: number);
-        setPermission(userId: number, permission: string): void;
+        constructor(name: string, rowStart?: number, rowEnd?: number, colStart?: number, colEnd?: number, permissions?: IPageRangeRights);
+        setPermission(userId: number, permission?: string): void;
         getPermission(userId: number): string;
         toObject(): IPageRange;
     }

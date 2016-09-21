@@ -720,7 +720,8 @@ namespace ipushpull {
         colStart: number;
         colEnd: number;
 
-        setPermission: (userId: number, permission: string) => void
+        setPermission: (userId: number, permission?: string) => void;
+        getPermission: (userId: number) => string;
     }
 
     export interface IPageFreezingRange extends IPageRangeItem {
@@ -735,14 +736,25 @@ namespace ipushpull {
             no: [],
         };
 
-        constructor(public name: string, public rowStart: number = 0, public rowEnd: number = 0, public colStart: number = 0, public colEnd: number = 0){}
+        constructor(public name: string, public rowStart: number = 0, public rowEnd: number = 0, public colStart: number = 0, public colEnd: number = 0, permissions?: IPageRangeRights){
+            if (permissions) {
+                this._permissions = permissions;
+            }
+        }
         
-        public setPermission(userId: number, permission: string): void {
+        public setPermission(userId: number, permission?: string): void {
             // First remove user rom all ranges
-            this._permissions.ro.splice(this._permissions.ro.indexOf(userId), 1);
-            this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
+            if (this._permissions.ro.indexOf(userId) >= 0) {
+                this._permissions.ro.splice(this._permissions.ro.indexOf(userId), 1);
+            }
 
-            this._permissions[permission].push(userId);
+            if (this._permissions.no.indexOf(userId) >= 0){
+                this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
+            }
+
+            if (permission){
+                this._permissions[permission].push(userId);
+            }
         }
 
         public getPermission(userId: number): string {
@@ -858,7 +870,9 @@ namespace ipushpull {
         }
 
         public removeRange(range: IPageRangeItem): IPageRangesCollection {
-            this._ranges.splice(this._ranges.indexOf(range), 1);
+            if (this._ranges.indexOf(range) >= 0) {
+                this._ranges.splice(this._ranges.indexOf(range), 1);
+            }
 
             return this;
         }
@@ -899,7 +913,7 @@ namespace ipushpull {
 
                     this._ranges.push(new FreezingRange(ar[i].name, subject, count));
                 } else {
-                    this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd));
+                    this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd, ar[i].rights));
                 }
             }
 

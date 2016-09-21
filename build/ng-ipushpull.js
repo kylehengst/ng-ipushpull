@@ -1055,7 +1055,7 @@ var ipushpull;
         return Page;
     }(EventEmitter));
     var PermissionRange = (function () {
-        function PermissionRange(name, rowStart, rowEnd, colStart, colEnd) {
+        function PermissionRange(name, rowStart, rowEnd, colStart, colEnd, permissions) {
             if (rowStart === void 0) { rowStart = 0; }
             if (rowEnd === void 0) { rowEnd = 0; }
             if (colStart === void 0) { colStart = 0; }
@@ -1069,11 +1069,20 @@ var ipushpull;
                 ro: [],
                 no: [],
             };
+            if (permissions) {
+                this._permissions = permissions;
+            }
         }
         PermissionRange.prototype.setPermission = function (userId, permission) {
-            this._permissions.ro.splice(this._permissions.ro.indexOf(userId), 1);
-            this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
-            this._permissions[permission].push(userId);
+            if (this._permissions.ro.indexOf(userId) >= 0) {
+                this._permissions.ro.splice(this._permissions.ro.indexOf(userId), 1);
+            }
+            if (this._permissions.no.indexOf(userId) >= 0) {
+                this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
+            }
+            if (permission) {
+                this._permissions[permission].push(userId);
+            }
         };
         PermissionRange.prototype.getPermission = function (userId) {
             var permission = "";
@@ -1169,7 +1178,6 @@ var ipushpull;
             var newName = range.name;
             var count = 1;
             while (!nameUnique) {
-                console.log(newName);
                 nameUnique = true;
                 for (var i = 0; i < this._ranges.length; i++) {
                     if (this._ranges[i].name === newName) {
@@ -1184,7 +1192,9 @@ var ipushpull;
             return this;
         };
         Ranges.prototype.removeRange = function (range) {
-            this._ranges.splice(this._ranges.indexOf(range), 1);
+            if (this._ranges.indexOf(range) >= 0) {
+                this._ranges.splice(this._ranges.indexOf(range), 1);
+            }
             return this;
         };
         Ranges.prototype.save = function () {
@@ -1215,7 +1225,7 @@ var ipushpull;
                     this._ranges.push(new FreezingRange(ar[i].name, subject, count));
                 }
                 else {
-                    this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd));
+                    this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd, ar[i].rights));
                 }
             }
             return this._ranges;
