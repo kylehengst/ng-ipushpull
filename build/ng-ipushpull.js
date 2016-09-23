@@ -1415,6 +1415,7 @@ var ipushpull;
             this._stopped = true;
         };
         ProviderSocket.prototype.destroy = function () {
+            this._socket.disconnect();
             this.stop();
             this.removeEvent();
         };
@@ -1440,6 +1441,7 @@ var ipushpull;
             return io.connect(config.url + "/page/" + this._pageId, {
                 query: query.join("&"),
                 transports: (this.supportsWebSockets()) ? ["websocket"] : ["polling"],
+                forceNew: true,
             });
         };
         return ProviderSocket;

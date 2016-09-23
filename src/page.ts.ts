@@ -1085,6 +1085,7 @@ namespace ipushpull {
         }
 
         public destroy(): void {
+            this._socket.disconnect();
             this.stop();
             this.removeEvent();
         }
@@ -1121,7 +1122,7 @@ namespace ipushpull {
             return io.connect(`${config.url}/page/${this._pageId}`, {
                 query: query.join("&"),
                 transports: (this.supportsWebSockets()) ? ["websocket"] : ["polling"],
-                // forceNew: true,
+                forceNew: true,
             });
         }
 
