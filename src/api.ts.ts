@@ -113,6 +113,8 @@ namespace ipushpull {
 
     export interface IApiService {
         parseError: (err: any, def: string) => string;
+        block: () => void;
+        unblock: () => void;
         getSelfInfo: () => IPromise<IRequestResult>;
         refreshAccessTokens: (refreshToken: string) => IPromise<IRequestResult>;
         userLogin: (data: any) => IPromise<IRequestResult>;
@@ -201,6 +203,14 @@ namespace ipushpull {
             }
 
             return msg;
+        }
+
+        public block(): void {
+            this._locked = true;
+        }
+
+        public unblock(): void {
+            this._locked = false;
         }
 
         public getSelfInfo(): IPromise<IRequestResult>{
@@ -549,26 +559,9 @@ namespace ipushpull {
 
             // Run authentication if 401
             if (parseInt(response.status, 10) === 401 && !this._locked && response.data.error !== "invalid_grant"){
-                // Lock down api
-                this._locked = true;
-
-                // Make sure access token is gone
-                this.storage.remove("access_token");
-
                 let ippAuth: IAuthService = this.$injector.get<IAuthService>("ippAuthService");
 
-                // Attempt to re-log in - no matter what the result is, resolve this promise - @todo cannot remember why?
-                console.log("Attempting to re-login");
-
-                ippAuth.authenticate(true).finally(() => {
-                    this._locked = false;
-                    // console.log("Unblocking Api");
-                });
-
-                // Hacky, but not sure what other way around it...
-                ippAuth.on(ippAuth.EVENT_LOGGED_IN, () => {
-                    this._locked = false;
-                });
+                ippAuth.emit(ippAuth.EVENT_401);
             }
 
             q.reject({

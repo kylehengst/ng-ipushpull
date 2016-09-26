@@ -1,7 +1,6 @@
 /**
  * Todo list
  * ------------------------------
- * @todo Even if autostart is off we should probably do the initial load....
  * @todo Socket should have proper implementation of start/stop mechanism
  * @todo Clonning encrypted pages - possible ?
  */
@@ -315,7 +314,7 @@ namespace ipushpull {
 
         public ready: boolean = false;
         public decrypted: boolean = true;
-        public updatesOn: boolean = false; // @todo I dont like this...
+        public updatesOn: boolean = true; // @todo I dont like this...
 
         public Ranges;
 
@@ -351,7 +350,6 @@ namespace ipushpull {
 
             if (template){
                 let page: IPageService = new Page(template.id, template.domain_id);
-                // @todo this business with autostart and receiving data etc is quite fiddly to say the least
                 page.on(page.EVENT_READY, () => {
                     page.clone(folderId, name)
                         .then(q.resolve, q.reject)
@@ -369,7 +367,6 @@ namespace ipushpull {
                 }).then((res) => {
                     // Start new page
                     let page: IPageService = new Page(res.data.id, folderId);
-                    // @todo this business with autostart and receiving data etc is quite fiddly to say the least
                     page.on(page.EVENT_READY, () => {
                         page.stop();
                         q.resolve(page);
@@ -382,7 +379,7 @@ namespace ipushpull {
             return q.promise;
         };
 
-        constructor(pageId: number | string, folderId: number | string, autoStart: boolean = true){
+        constructor(pageId: number | string, folderId: number | string){
             super();
 
             // Decide if client can use websockets
@@ -397,10 +394,8 @@ namespace ipushpull {
             // If we dont have page id, cannot start autopulling
             // @todo Should we emit some error to user?
             if (!this._pageId){
-                autoStart = false;
+                this.updatesOn = false;
             }
-
-            this.updatesOn = autoStart;
 
             // If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
             if (!this._pageId) {
@@ -408,12 +403,12 @@ namespace ipushpull {
                     this._pageId = res.pageId;
                     this._folderId = res.folderId;
 
-                    this.init(autoStart);
+                    this.init();
                 }, (err) => {
                         // @todo Handle error
                 });
             } else {
-                this.init(autoStart);
+                this.init();
             }
         }
 
@@ -519,7 +514,7 @@ namespace ipushpull {
             return q.promise;
         }
 
-        private init(autoStart: boolean = true): void{
+        private init(): void{
             this.Ranges = new Ranges(this._folderId, this._pageId);
 
             if (!this._supportsWS || typeof io === "undefined"){
@@ -529,8 +524,8 @@ namespace ipushpull {
 
             // Create provider
             this._provider = (!this._supportsWS || typeof io === "undefined" || config.transport === "polling")
-                ? new ProviderREST(this._pageId, this._folderId, autoStart)
-                : new ProviderSocket(this._pageId, this._folderId, autoStart);
+                ? new ProviderREST(this._pageId, this._folderId)
+                : new ProviderSocket(this._pageId, this._folderId);
 
             // Start pulling page access
             this.getPageAccess();
@@ -614,11 +609,11 @@ namespace ipushpull {
                 err.code = err.httpCode || err.code;
                 err.message = err.httpText || err.message;
 
-                if (err.code === 404){
-                    this.stop();
-                }
-
                 this.emit(this.EVENT_ERROR, err.message);
+
+                if (err.code === 404){
+                    this.destroy();
+                }
             });
         }
 
@@ -936,12 +931,10 @@ namespace ipushpull {
 
         private _seqNo: number = 0;
 
-        constructor(private _pageId?: number, private _folderId?: number, autoStart: boolean = true){
+        constructor(private _pageId?: number, private _folderId?: number){
             super();
 
-            if (autoStart){
-                this.start();
-            }
+            this.start();
         }
 
         public start(): void {
@@ -1059,12 +1052,13 @@ namespace ipushpull {
         private _stopped: boolean = false;
         private _socket: Socket;
 
-        constructor(private _pageId?: number, private _folderId?: number, autoStart: boolean = true){
+        constructor(private _pageId?: number, private _folderId?: number){
             super();
 
-            if (autoStart){
-                this.start();
-            }
+            this.start();
+
+            // Because socket is disconnected on lost access, we need to reconnect it
+            auth.on(auth.EVENT_LOGIN_REFRESHED, this.onAuthRefresh);
         }
 
         // This is really just for content
@@ -1085,9 +1079,11 @@ namespace ipushpull {
         }
 
         public destroy(): void {
+            this._socket.removeAllListeners();
             this._socket.disconnect();
             this.stop();
-            this.removeEvent();
+            auth.off(auth.EVENT_LOGIN_REFRESHED, this.onAuthRefresh);
+            this.removeEvent(); // @todo this means that listeners will be still registered even though none are gonna get triggered - memory leak?
         }
 
         private init(): void {
@@ -1103,9 +1099,7 @@ namespace ipushpull {
             /*this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_DATA, this.onPageData);
              this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_USER_JOINED, this.onPageUserJoined);
              this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_USER_LEFT, this.onPageUserLeft);*/
-            this._socket.on("disconnect", () => {
-                return;
-            });
+            this._socket.on("disconnect", this.onDisconnect);
 
             this._stopped = false;
         }
@@ -1130,6 +1124,10 @@ namespace ipushpull {
             return;
         };
 
+        private onDisconnect: any = () => {
+            return;
+        };
+
         private onPageContent = (data: IPageServiceContent): void => {
             $timeout(() => {
                 this.emit("content_update", data);
@@ -1145,9 +1143,7 @@ namespace ipushpull {
         private onPageError = (data: any): void => {
             $timeout(() => {
                 if (data.code === 401){
-                    auth.authenticate(true).then(() => {
-                        this.start();
-                    });
+                    auth.emit(auth.EVENT_401);
                 } else {
                     this.emit("error", data);
                 }
@@ -1160,6 +1156,11 @@ namespace ipushpull {
             // @todo should we watch auth service for re-logged and re-connect?
 
             // @todo Emit page error ?
+        };
+
+        private onAuthRefresh = (): void => {
+            let dummy: number = this._pageId; // This is here just to make the callback different, otherwise event emitter prevents duplicates
+            this.start();
         };
 
         private supportsWebSockets = () => { return "WebSocket" in window || "MozWebSocket" in window; };

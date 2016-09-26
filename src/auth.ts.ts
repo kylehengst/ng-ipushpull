@@ -8,8 +8,10 @@ namespace ipushpull {
     export interface IAuthService extends IEventEmitter {
         EVENT_LOGGED_IN: string;
         EVENT_RE_LOGGING: string;
+        EVENT_LOGIN_REFRESHED: string;
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
+        EVENT_401: string;
 
         user: IUserSelf;
 
@@ -39,10 +41,12 @@ namespace ipushpull {
     class Auth extends EventEmitter {
         public static $inject: string[] = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
 
-        public get EVENT_LOGGED_IN(): string { return "logged_in"; }
-        public get EVENT_RE_LOGGING(): string { return "re_logging"; }
-        public get EVENT_LOGGED_OUT(): string { return "logged_out"; }
+        public get EVENT_LOGGED_IN(): string { return "logged_in"; } // emitted when logged in (not on login refresh)
+        public get EVENT_RE_LOGGING(): string { return "re_logging"; } // emitted when re-logging started
+        public get EVENT_LOGIN_REFRESHED(): string { return "login_refreshed"; } // emitted only after 401 and re-login
+        public get EVENT_LOGGED_OUT(): string { return "logged_out"; } // emitted when logged out
         public get EVENT_ERROR(): string { return "error"; }
+        public get EVENT_401(): string { return "401"; } // listener
 
         private _user: IUserSelf | any = {};
         private _authenticated: boolean = false;
@@ -52,9 +56,10 @@ namespace ipushpull {
 
         constructor(private $q: IQService, private ippApi: IApiService, private storage, private config: any){
             super();
+
+            this.on("401", this.on401);
         }
 
-        // @todo better name?
         public authenticate(force: boolean = false): IPromise<any>{
             let q: IDeferred<any> = this.$q.defer();
 
@@ -72,9 +77,10 @@ namespace ipushpull {
             }
 
             this.processAuth().then((res) => {
-                this._authenticated = true;
-
-                this.emit(this.EVENT_LOGGED_IN);
+                if (!this._authenticated) {
+                    this._authenticated = true;
+                    this.emit(this.EVENT_LOGGED_IN);
+                }
 
                 q.resolve();
             }, (err) => {
@@ -92,7 +98,6 @@ namespace ipushpull {
             return q.promise;
         }
 
-        // @todo What a mess...
         public login(username: string, password: string): IPromise<any> {
             let q: IDeferred<any> = this.$q.defer();
 
@@ -168,8 +173,6 @@ namespace ipushpull {
         private refreshTokens(): IPromise<any> {
             let refreshToken: string = this.storage.get("refresh_token");
 
-            this.emit(this.EVENT_RE_LOGGING); // @todo do we need this?
-
             return this.ippApi.refreshAccessTokens(refreshToken);
         }
 
@@ -188,6 +191,25 @@ namespace ipushpull {
 
             return q.promise;
         }
+
+        private on401: any = () => {
+            // Block rest api
+            this.ippApi.block();
+
+            // Remove access token
+            this.storage.remove("access_token");
+
+            this.emit(this.EVENT_RE_LOGGING); // @todo do we need this?
+
+            // Try to authenticate
+            this.authenticate(true).then(() => {
+                this.emit(this.EVENT_LOGIN_REFRESHED);
+            }, () => {
+                this.emit(this.EVENT_ERROR);
+            }).finally(() => {
+                this.ippApi.unblock();
+            });
+        };
     }
 
     ipushpull.module.service("ippAuthService", Auth);

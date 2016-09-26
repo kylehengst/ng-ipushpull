@@ -145,16 +145,8 @@ var ipushpull;
             this.handleError = function (response) {
                 var q = _this.$q.defer();
                 if (parseInt(response.status, 10) === 401 && !_this._locked && response.data.error !== "invalid_grant") {
-                    _this._locked = true;
-                    _this.storage.remove("access_token");
                     var ippAuth = _this.$injector.get("ippAuthService");
-                    console.log("Attempting to re-login");
-                    ippAuth.authenticate(true).finally(function () {
-                        _this._locked = false;
-                    });
-                    ippAuth.on(ippAuth.EVENT_LOGGED_IN, function () {
-                        _this._locked = false;
-                    });
+                    ippAuth.emit(ippAuth.EVENT_401);
                 }
                 q.reject({
                     success: false,
@@ -189,6 +181,12 @@ var ipushpull;
                 msg = def;
             }
             return msg;
+        };
+        Api.prototype.block = function () {
+            this._locked = true;
+        };
+        Api.prototype.unblock = function () {
+            this._locked = false;
         };
         Api.prototype.getSelfInfo = function () {
             return this
@@ -429,6 +427,7 @@ var ipushpull;
     var Auth = (function (_super) {
         __extends(Auth, _super);
         function Auth($q, ippApi, storage, config) {
+            var _this = this;
             _super.call(this);
             this.$q = $q;
             this.ippApi = ippApi;
@@ -437,6 +436,19 @@ var ipushpull;
             this._user = {};
             this._authenticated = false;
             this._authInProgress = false;
+            this.on401 = function () {
+                _this.ippApi.block();
+                _this.storage.remove("access_token");
+                _this.emit(_this.EVENT_RE_LOGGING);
+                _this.authenticate(true).then(function () {
+                    _this.emit(_this.EVENT_LOGIN_REFRESHED);
+                }, function () {
+                    _this.emit(_this.EVENT_ERROR);
+                }).finally(function () {
+                    _this.ippApi.unblock();
+                });
+            };
+            this.on("401", this.on401);
         }
         Object.defineProperty(Auth.prototype, "EVENT_LOGGED_IN", {
             get: function () { return "logged_in"; },
@@ -448,6 +460,11 @@ var ipushpull;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Auth.prototype, "EVENT_LOGIN_REFRESHED", {
+            get: function () { return "login_refreshed"; },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Auth.prototype, "EVENT_LOGGED_OUT", {
             get: function () { return "logged_out"; },
             enumerable: true,
@@ -455,6 +472,11 @@ var ipushpull;
         });
         Object.defineProperty(Auth.prototype, "EVENT_ERROR", {
             get: function () { return "error"; },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Auth.prototype, "EVENT_401", {
+            get: function () { return "401"; },
             enumerable: true,
             configurable: true
         });
@@ -478,8 +500,10 @@ var ipushpull;
                 return q.promise;
             }
             this.processAuth().then(function (res) {
-                _this._authenticated = true;
-                _this.emit(_this.EVENT_LOGGED_IN);
+                if (!_this._authenticated) {
+                    _this._authenticated = true;
+                    _this.emit(_this.EVENT_LOGGED_IN);
+                }
                 q.resolve();
             }, function (err) {
                 _this.emit(_this.EVENT_ERROR, err);
@@ -559,7 +583,6 @@ var ipushpull;
         };
         Auth.prototype.refreshTokens = function () {
             var refreshToken = this.storage.get("refresh_token");
-            this.emit(this.EVENT_RE_LOGGING);
             return this.ippApi.refreshAccessTokens(refreshToken);
         };
         Auth.prototype.saveTokens = function (tokens) {
@@ -682,13 +705,12 @@ var ipushpull;
     ipushpull.module.service("ippPageService", PageWrap);
     var Page = (function (_super) {
         __extends(Page, _super);
-        function Page(pageId, folderId, autoStart) {
+        function Page(pageId, folderId) {
             var _this = this;
-            if (autoStart === void 0) { autoStart = true; }
             _super.call(this);
             this.ready = false;
             this.decrypted = true;
-            this.updatesOn = false;
+            this.updatesOn = true;
             this._supportsWS = true;
             this._encryptionKeyPull = {
                 name: "",
@@ -704,19 +726,18 @@ var ipushpull;
             this._folderName = (isNaN(+folderId)) ? folderId : undefined;
             this._pageName = (isNaN(+pageId)) ? pageId : undefined;
             if (!this._pageId) {
-                autoStart = false;
+                this.updatesOn = false;
             }
-            this.updatesOn = autoStart;
             if (!this._pageId) {
                 this.getPageId(this._folderName, this._pageName).then(function (res) {
                     _this._pageId = res.pageId;
                     _this._folderId = res.folderId;
-                    _this.init(autoStart);
+                    _this.init();
                 }, function (err) {
                 });
             }
             else {
-                this.init(autoStart);
+                this.init();
             }
         }
         Object.defineProperty(Page.prototype, "TYPE_REGULAR", {
@@ -916,17 +937,16 @@ var ipushpull;
             });
             return q.promise;
         };
-        Page.prototype.init = function (autoStart) {
+        Page.prototype.init = function () {
             var _this = this;
-            if (autoStart === void 0) { autoStart = true; }
             this.Ranges = new Ranges(this._folderId, this._pageId);
             if (!this._supportsWS || typeof io === "undefined") {
                 console.warn("[iPushPull] Cannot use websocket technology it is not supported or websocket library is not included. " +
                     "Make sure socket-io client is incldued or use ng-ipushpull-standalone.min.js");
             }
             this._provider = (!this._supportsWS || typeof io === "undefined" || config.transport === "polling")
-                ? new ProviderREST(this._pageId, this._folderId, autoStart)
-                : new ProviderSocket(this._pageId, this._folderId, autoStart);
+                ? new ProviderREST(this._pageId, this._folderId)
+                : new ProviderSocket(this._pageId, this._folderId);
             this.getPageAccess();
             this._accessInterval = $interval(function () {
                 _this.getPageAccess();
@@ -980,10 +1000,10 @@ var ipushpull;
             this._provider.on("error", function (err) {
                 err.code = err.httpCode || err.code;
                 err.message = err.httpText || err.message;
-                if (err.code === 404) {
-                    _this.stop();
-                }
                 _this.emit(_this.EVENT_ERROR, err.message);
+                if (err.code === 404) {
+                    _this.destroy();
+                }
             });
         };
         Page.prototype.pushFull = function (content) {
@@ -1234,8 +1254,7 @@ var ipushpull;
     }());
     var ProviderREST = (function (_super) {
         __extends(ProviderREST, _super);
-        function ProviderREST(_pageId, _folderId, autoStart) {
-            if (autoStart === void 0) { autoStart = true; }
+        function ProviderREST(_pageId, _folderId) {
             _super.call(this);
             this._pageId = _pageId;
             this._folderId = _folderId;
@@ -1243,9 +1262,7 @@ var ipushpull;
             this._requestOngoing = false;
             this._timeout = 1000;
             this._seqNo = 0;
-            if (autoStart) {
-                this.start();
-            }
+            this.start();
         }
         ProviderREST.prototype.start = function () {
             this._stopped = false;
@@ -1328,14 +1345,16 @@ var ipushpull;
     }(EventEmitter));
     var ProviderSocket = (function (_super) {
         __extends(ProviderSocket, _super);
-        function ProviderSocket(_pageId, _folderId, autoStart) {
+        function ProviderSocket(_pageId, _folderId) {
             var _this = this;
-            if (autoStart === void 0) { autoStart = true; }
             _super.call(this);
             this._pageId = _pageId;
             this._folderId = _folderId;
             this._stopped = false;
             this.onConnect = function () {
+                return;
+            };
+            this.onDisconnect = function () {
                 return;
             };
             this.onPageContent = function (data) {
@@ -1351,9 +1370,7 @@ var ipushpull;
             this.onPageError = function (data) {
                 $timeout(function () {
                     if (data.code === 401) {
-                        auth.authenticate(true).then(function () {
-                            _this.start();
-                        });
+                        auth.emit(auth.EVENT_401);
                     }
                     else {
                         _this.emit("error", data);
@@ -1362,10 +1379,13 @@ var ipushpull;
             };
             this.onOAuthError = function (data) {
             };
+            this.onAuthRefresh = function () {
+                var dummy = _this._pageId;
+                _this.start();
+            };
             this.supportsWebSockets = function () { return "WebSocket" in window || "MozWebSocket" in window; };
-            if (autoStart) {
-                this.start();
-            }
+            this.start();
+            auth.on(auth.EVENT_LOGIN_REFRESHED, this.onAuthRefresh);
         }
         Object.defineProperty(ProviderSocket, "SOCKET_EVENT_PAGE_ERROR", {
             get: function () { return "page_error"; },
@@ -1415,8 +1435,10 @@ var ipushpull;
             this._stopped = true;
         };
         ProviderSocket.prototype.destroy = function () {
+            this._socket.removeAllListeners();
             this._socket.disconnect();
             this.stop();
+            auth.off(auth.EVENT_LOGIN_REFRESHED, this.onAuthRefresh);
             this.removeEvent();
         };
         ProviderSocket.prototype.init = function () {
@@ -1426,9 +1448,7 @@ var ipushpull;
             this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_SETTINGS, this.onPageSettings);
             this._socket.on(ProviderSocket.SOCKET_EVENT_PAGE_ERROR, this.onPageError);
             this._socket.on("oauth_error", this.onOAuthError);
-            this._socket.on("disconnect", function () {
-                return;
-            });
+            this._socket.on("disconnect", this.onDisconnect);
             this._stopped = false;
         };
         ProviderSocket.prototype.connect = function () {

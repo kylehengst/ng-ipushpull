@@ -8,6 +8,8 @@ declare namespace ipushpull {
     }
     interface IApiService {
         parseError: (err: any, def: string) => string;
+        block: () => void;
+        unblock: () => void;
         getSelfInfo: () => IPromise<IRequestResult>;
         refreshAccessTokens: (refreshToken: string) => IPromise<IRequestResult>;
         userLogin: (data: any) => IPromise<IRequestResult>;

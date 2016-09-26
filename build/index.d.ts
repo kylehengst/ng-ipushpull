@@ -1183,6 +1183,8 @@ declare namespace ipushpull {
     }
     interface IApiService {
         parseError: (err: any, def: string) => string;
+        block: () => void;
+        unblock: () => void;
         getSelfInfo: () => IPromise<IRequestResult>;
         refreshAccessTokens: (refreshToken: string) => IPromise<IRequestResult>;
         userLogin: (data: any) => IPromise<IRequestResult>;
@@ -1246,8 +1248,10 @@ declare namespace ipushpull {
     interface IAuthService extends IEventEmitter {
         EVENT_LOGGED_IN: string;
         EVENT_RE_LOGGING: string;
+        EVENT_LOGIN_REFRESHED: string;
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
+        EVENT_401: string;
         user: IUserSelf;
         authenticate: (force?: boolean) => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
