@@ -720,6 +720,16 @@ var ipushpull;
                 name: "",
                 passphrase: "",
             };
+            this.types = {
+                regular: this.TYPE_REGULAR,
+                pageAccessReport: this.TYPE_PAGE_ACCESS_REPORT,
+                domainUsageReport: this.TYPE_DOMAIN_USAGE_REPORT,
+                globalUsageReport: this.TYPE_GLOBAL_USAGE_REPORT,
+                pageUpdateReport: this.TYPE_PAGE_UPDATE_REPORT,
+                alert: this.TYPE_ALERT,
+                pdf: this.TYPE_PDF,
+                liveUsage: this.TYPE_LIVE_USAGE_REPORT,
+            };
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
             this._folderId = (!isNaN(+folderId)) ? folderId : undefined;
             this._pageId = (!isNaN(+pageId)) ? pageId : undefined;
@@ -878,6 +888,18 @@ var ipushpull;
             else {
                 return this.pushFull(data);
             }
+        };
+        Page.prototype.saveMeta = function (data) {
+            var q = $q.defer();
+            delete data.access_rights;
+            api.savePageSettings({
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: data,
+            }).then(q.resolve, function (err) {
+                q.reject(api.parseError(err, "Could not save page settings"));
+            });
+            return q.promise;
         };
         Page.prototype.decrypt = function (key) {
             if (!key) {

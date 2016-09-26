@@ -242,6 +242,7 @@ namespace ipushpull {
         start: () => void;
         stop: () => void;
         push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
+        saveMeta: (data: any) => IPromise<any>;
         destroy: () => void;
         decrypt: (key: IEncryptionKey) => void;
         clone: (folderId: number, name: string, options?: IPageCloneOptions) => IPromise<IPageService>;
@@ -315,6 +316,7 @@ namespace ipushpull {
         public ready: boolean = false;
         public decrypted: boolean = true;
         public updatesOn: boolean = true; // @todo I dont like this...
+        public types: any;
 
         public Ranges;
 
@@ -382,6 +384,18 @@ namespace ipushpull {
         constructor(pageId: number | string, folderId: number | string){
             super();
 
+            // Types
+            this.types = {
+                regular: this.TYPE_REGULAR,
+                pageAccessReport: this.TYPE_PAGE_ACCESS_REPORT,
+                domainUsageReport: this.TYPE_DOMAIN_USAGE_REPORT,
+                globalUsageReport: this.TYPE_GLOBAL_USAGE_REPORT,
+                pageUpdateReport: this.TYPE_PAGE_UPDATE_REPORT,
+                alert: this.TYPE_ALERT,
+                pdf: this.TYPE_PDF,
+                liveUsage: this.TYPE_LIVE_USAGE_REPORT,
+            };
+
             // Decide if client can use websockets
             this._supportsWS = "WebSocket" in window || "MozWebSocket" in window;
 
@@ -434,6 +448,23 @@ namespace ipushpull {
             } else {
                 return this.pushFull(<IPageContent>data);
             }
+        }
+
+        public saveMeta(data: any): IPromise<any>{
+            let q: IDeferred<any> = $q.defer();
+            // Remove access rights (if any)
+            delete data.access_rights;
+
+            // @todo Validation
+            api.savePageSettings({
+                domainId: this._folderId,
+                pageId: this._pageId,
+                data: data,
+            }).then(q.resolve, (err) => {
+                q.reject(api.parseError(err, "Could not save page settings"));
+            });
+
+            return q.promise;
         }
 
         // @todo This is NOT good
