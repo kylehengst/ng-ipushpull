@@ -178,7 +178,7 @@ namespace ipushpull {
         private _locked: boolean = false;
 
         constructor(private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private $q: IQService, private $injector: IInjectorService, private storage, private config: IIPPConfig){
-            this._endPoint = `${this.config.api_url}/api/1.0/`;
+            this._endPoint = `${this.config.api_url}`;
         }
 
         public parseError(err: any, def: string): string {
@@ -215,14 +215,14 @@ namespace ipushpull {
 
         public getSelfInfo(): IPromise<IRequestResult>{
             return this
-                .send(Request.get(this._endPoint + "users/self/")
+                .send(Request.get(this._endPoint + "/users/self/")
                 .cache(false)
                 .overrideLock());
         }
 
         public refreshAccessTokens(refreshToken: string): IPromise<IRequestResult>{
             return this.send(
-                Request.post(this._endPoint + "oauth/token/")
+                Request.post(this._endPoint + "/oauth/token/")
                     .data(this.$httpParamSerializerJQLike({
                         grant_type: "refresh_token",
                         client_id: this.config.api_key,
@@ -238,7 +238,7 @@ namespace ipushpull {
 
         public userLogin(data: any): IPromise<IRequestResult>{
             return this.send(
-                Request.post(this._endPoint + "oauth/token/")
+                Request.post(this._endPoint + "/oauth/token/")
                     .data(this.$httpParamSerializerJQLike({
                         grant_type: "password",
                         client_id: this.config.api_key,
@@ -253,37 +253,37 @@ namespace ipushpull {
         }
 
         public getDomains(): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/"));
+            return this.send(Request.get(this._endPoint + "/domains/"));
         }
 
         public getDomain(domainId: number): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/" + domainId + "/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + domainId + "/"));
         }
 
         public createFolder(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "domains/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/").data(data.data));
         }
 
         public updateDomain(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .put(this._endPoint + "domains/" + data.domainId + "/")
+                    .put(this._endPoint + "/domains/" + data.domainId + "/")
                     .data(data.data)
             );
         }
 
         public getDomainPages(domainId: number): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/" + domainId + "/page_access/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + domainId + "/page_access/"));
         }
 
         public getDomainsAndPages(): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domain_page_access/"));
+            return this.send(Request.get(this._endPoint + "/domain_page_access/"));
         }
 
         public getPage(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .get(this._endPoint + "domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
+                    .get(this._endPoint + "/domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
                     .params({client_seq_no: data.seq_no})
             );
         }
@@ -291,19 +291,19 @@ namespace ipushpull {
         public getPageByName(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .get(this._endPoint + "domains/name/" + data.domainId + "/page_content/name/" + data.pageId + "/")
+                    .get(this._endPoint + "/domains/name/" + data.domainId + "/page_content/name/" + data.pageId + "/")
                     .params({client_seq_no: data.seq_no})
             );
         }
 
         public getPageAccess(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/id/" + data.domainId + "/page_access/id/" + data.pageId + "/"));
+            return this.send(Request.get(this._endPoint + "/domains/id/" + data.domainId + "/page_access/id/" + data.pageId + "/"));
         }
 
         public createPage(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .post(this._endPoint + "domains/" + data.domainId + "/pages/")
+                    .post(this._endPoint + "/domains/" + data.domainId + "/pages/")
                     .data({name: data.data.name})
             );
         }
@@ -311,7 +311,7 @@ namespace ipushpull {
         public savePageContent(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .put(this._endPoint + "domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
+                    .put(this._endPoint + "/domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
                     .data(data.data)
             );
         }
@@ -319,7 +319,7 @@ namespace ipushpull {
         public savePageContentDelta(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .put(this._endPoint + "domains/id/" + data.domainId + "/page_content_delta/id/" + data.pageId + "/")
+                    .put(this._endPoint + "/domains/id/" + data.domainId + "/page_content_delta/id/" + data.pageId + "/")
                     .data(data.data)
             );
         }
@@ -327,51 +327,51 @@ namespace ipushpull {
         public savePageSettings(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .put(this._endPoint + "domains/" + data.domainId + "/pages/" + data.pageId + "/")
+                    .put(this._endPoint + "/domains/" + data.domainId + "/pages/" + data.pageId + "/")
                     .data(data.data)
             );
         }
 
         public deletePage(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/pages/" + data.pageId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/pages/" + data.pageId + "/"));
         }
 
         public saveUserInfo(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "users/self/").data(data));
+            return this.send(Request.put(this._endPoint + "/users/self/").data(data));
         }
 
         public changePassword(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "credentials/self/").data(data));
+            return this.send(Request.put(this._endPoint + "/credentials/self/").data(data));
         }
 
         public changeEmail(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "credentials/self/").data(data));
+            return this.send(Request.put(this._endPoint + "/credentials/self/").data(data));
         }
 
         public forgotPassword(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "password_reset/").data(data));
+            return this.send(Request.post(this._endPoint + "/password_reset/").data(data));
         }
 
         public resetPassword(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "password_reset/confirm/").data(data));
+            return this.send(Request.post(this._endPoint + "/password_reset/confirm/").data(data));
         }
 
         public inviteUsers(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/invitations/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/invitations/").data(data.data));
         }
 
         public acceptInvitation(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "users/invitation/confirm/").data(data));
+            return this.send(Request.post(this._endPoint + "/users/invitation/confirm/").data(data));
         }
 
         public refuseInvitation(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "users/invitation/confirm/").data(data));
+            return this.send(Request.del(this._endPoint + "/users/invitation/confirm/").data(data));
         }
 
         public domainInvitations(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .get(this._endPoint + "domains/" + data.domainId + "/invitations/")
+                    .get(this._endPoint + "/domains/" + data.domainId + "/invitations/")
                     .params({is_complete: "False"})
             );
         }
@@ -379,7 +379,7 @@ namespace ipushpull {
         public userInvitations(): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .get(this._endPoint + "users/self/invitations/")
+                    .get(this._endPoint + "/users/self/invitations/")
                     .params({is_complete: "False"})
             );
         }
@@ -387,113 +387,113 @@ namespace ipushpull {
         public domainAccessLog(data: any): IPromise<IRequestResult>{
             return this.send(
                 Request
-                    .get(this._endPoint + "domain_access/" + data.domainId + "/events/")
+                    .get(this._endPoint + "/domain_access/" + data.domainId + "/events/")
                     .params({page_size: data.limit})
             );
         }
 
         public domainUsers(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domain_access/" + data.domainId + "/users/"));
+            return this.send(Request.get(this._endPoint + "/domain_access/" + data.domainId + "/users/"));
         }
 
         public activateUser(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "users/signup/confirm/").data(data));
+            return this.send(Request.post(this._endPoint + "/users/signup/confirm/").data(data));
         }
 
         public setDomainDefault(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "domain_access/" + data.domainId + "/users/self/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domain_access/" + data.domainId + "/users/self/").data(data.data));
         }
 
         public resendInvite(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/invitations/" + data.inviteId + "/resend/"));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/invitations/" + data.inviteId + "/resend/"));
         }
 
         public updateDomainAccess(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "domain_access/" + data.domainId + "/users/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domain_access/" + data.domainId + "/users/").data(data.data));
         }
 
         public removeUsersFromDomain(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "domain_access/" + data.domainId + "/users/").data(data.data));
+            return this.send(Request.del(this._endPoint + "/domain_access/" + data.domainId + "/users/").data(data.data));
         }
 
         public getInvitation(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "users/invitations/" + data.token + "/"));
+            return this.send(Request.get(this._endPoint + "/users/invitations/" + data.token + "/"));
         }
 
         public cancelInvitations(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/invitations/").data(data.data));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/invitations/").data(data.data));
         }
 
         public getDomainAccessGroups(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/access_groups/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/access_groups/"));
         }
 
         public getDomainAccessGroup(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.groupId + "/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.groupId + "/"));
         }
 
         public addDomainAccessGroup(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/access_groups/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/access_groups/").data(data.data));
         }
 
         public putDomainAgroupMembers(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/members/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/members/").data(data.data));
         }
 
         public putDomainAgroupPages(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/pages/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/pages/").data(data.data));
         }
 
         public updateDomainAgroup(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/").data(data.data));
         }
 
         public deleteDomainAGroup(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/"));
         }
 
         public getDomainPageAccess(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domain_page_access/" + data.domainId + "/"));
+            return this.send(Request.get(this._endPoint + "/domain_page_access/" + data.domainId + "/"));
         }
 
         public getDomainCustomers(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/customers/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/customers/"));
         }
 
         public saveDomainPageAccess(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "domain_page_access/" + data.domainId + "/basic/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domain_page_access/" + data.domainId + "/basic/").data(data.data));
         }
 
         public getTemplates(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "templates/"));
+            return this.send(Request.get(this._endPoint + "/templates/"));
         }
 
         public saveCustomer(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/customers/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/customers/").data(data.data));
         }
 
         public updateCustomer(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/customers/" + data.data.id + "/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/customers/" + data.data.id + "/").data(data.data));
         }
 
         public removeCustomer(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/customers/" + data.customerId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/customers/" + data.customerId + "/"));
         }
 
         public getDocEmailRules(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/docsnames/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/docsnames/"));
         }
 
         public createDocEmailRule(data: any): IPromise<IRequestResult>{
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/docsnames/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/docsnames/").data(data.data));
         }
 
         public updateDocEmailRule(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/").data(data.data));
         }
 
         public deleteDocEmailRule(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
         }
 
         private send(request: Request): IPromise<IRequestResult> {

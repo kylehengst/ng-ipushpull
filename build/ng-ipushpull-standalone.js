@@ -7399,7 +7399,7 @@ var ipushpull;
                 });
                 return q.promise;
             };
-            this._endPoint = this.config.api_url + "/api/1.0/";
+            this._endPoint = "" + this.config.api_url;
         }
         Api.prototype.parseError = function (err, def) {
             var msg = def;
@@ -7433,12 +7433,12 @@ var ipushpull;
         };
         Api.prototype.getSelfInfo = function () {
             return this
-                .send(Request.get(this._endPoint + "users/self/")
+                .send(Request.get(this._endPoint + "/users/self/")
                 .cache(false)
                 .overrideLock());
         };
         Api.prototype.refreshAccessTokens = function (refreshToken) {
-            return this.send(Request.post(this._endPoint + "oauth/token/")
+            return this.send(Request.post(this._endPoint + "/oauth/token/")
                 .data(this.$httpParamSerializerJQLike({
                 grant_type: "refresh_token",
                 client_id: this.config.api_key,
@@ -7451,7 +7451,7 @@ var ipushpull;
                 .overrideLock());
         };
         Api.prototype.userLogin = function (data) {
-            return this.send(Request.post(this._endPoint + "oauth/token/")
+            return this.send(Request.post(this._endPoint + "/oauth/token/")
                 .data(this.$httpParamSerializerJQLike({
                 grant_type: "password",
                 client_id: this.config.api_key,
@@ -7464,177 +7464,177 @@ var ipushpull;
             }));
         };
         Api.prototype.getDomains = function () {
-            return this.send(Request.get(this._endPoint + "domains/"));
+            return this.send(Request.get(this._endPoint + "/domains/"));
         };
         Api.prototype.getDomain = function (domainId) {
-            return this.send(Request.get(this._endPoint + "domains/" + domainId + "/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + domainId + "/"));
         };
         Api.prototype.createFolder = function (data) {
-            return this.send(Request.post(this._endPoint + "domains/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/").data(data.data));
         };
         Api.prototype.updateDomain = function (data) {
             return this.send(Request
-                .put(this._endPoint + "domains/" + data.domainId + "/")
+                .put(this._endPoint + "/domains/" + data.domainId + "/")
                 .data(data.data));
         };
         Api.prototype.getDomainPages = function (domainId) {
-            return this.send(Request.get(this._endPoint + "domains/" + domainId + "/page_access/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + domainId + "/page_access/"));
         };
         Api.prototype.getDomainsAndPages = function () {
-            return this.send(Request.get(this._endPoint + "domain_page_access/"));
+            return this.send(Request.get(this._endPoint + "/domain_page_access/"));
         };
         Api.prototype.getPage = function (data) {
             return this.send(Request
-                .get(this._endPoint + "domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
+                .get(this._endPoint + "/domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
                 .params({ client_seq_no: data.seq_no }));
         };
         Api.prototype.getPageByName = function (data) {
             return this.send(Request
-                .get(this._endPoint + "domains/name/" + data.domainId + "/page_content/name/" + data.pageId + "/")
+                .get(this._endPoint + "/domains/name/" + data.domainId + "/page_content/name/" + data.pageId + "/")
                 .params({ client_seq_no: data.seq_no }));
         };
         Api.prototype.getPageAccess = function (data) {
-            return this.send(Request.get(this._endPoint + "domains/id/" + data.domainId + "/page_access/id/" + data.pageId + "/"));
+            return this.send(Request.get(this._endPoint + "/domains/id/" + data.domainId + "/page_access/id/" + data.pageId + "/"));
         };
         Api.prototype.createPage = function (data) {
             return this.send(Request
-                .post(this._endPoint + "domains/" + data.domainId + "/pages/")
+                .post(this._endPoint + "/domains/" + data.domainId + "/pages/")
                 .data({ name: data.data.name }));
         };
         Api.prototype.savePageContent = function (data) {
             return this.send(Request
-                .put(this._endPoint + "domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
+                .put(this._endPoint + "/domains/id/" + data.domainId + "/page_content/id/" + data.pageId + "/")
                 .data(data.data));
         };
         Api.prototype.savePageContentDelta = function (data) {
             return this.send(Request
-                .put(this._endPoint + "domains/id/" + data.domainId + "/page_content_delta/id/" + data.pageId + "/")
+                .put(this._endPoint + "/domains/id/" + data.domainId + "/page_content_delta/id/" + data.pageId + "/")
                 .data(data.data));
         };
         Api.prototype.savePageSettings = function (data) {
             return this.send(Request
-                .put(this._endPoint + "domains/" + data.domainId + "/pages/" + data.pageId + "/")
+                .put(this._endPoint + "/domains/" + data.domainId + "/pages/" + data.pageId + "/")
                 .data(data.data));
         };
         Api.prototype.deletePage = function (data) {
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/pages/" + data.pageId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/pages/" + data.pageId + "/"));
         };
         Api.prototype.saveUserInfo = function (data) {
-            return this.send(Request.put(this._endPoint + "users/self/").data(data));
+            return this.send(Request.put(this._endPoint + "/users/self/").data(data));
         };
         Api.prototype.changePassword = function (data) {
-            return this.send(Request.put(this._endPoint + "credentials/self/").data(data));
+            return this.send(Request.put(this._endPoint + "/credentials/self/").data(data));
         };
         Api.prototype.changeEmail = function (data) {
-            return this.send(Request.put(this._endPoint + "credentials/self/").data(data));
+            return this.send(Request.put(this._endPoint + "/credentials/self/").data(data));
         };
         Api.prototype.forgotPassword = function (data) {
-            return this.send(Request.post(this._endPoint + "password_reset/").data(data));
+            return this.send(Request.post(this._endPoint + "/password_reset/").data(data));
         };
         Api.prototype.resetPassword = function (data) {
-            return this.send(Request.post(this._endPoint + "password_reset/confirm/").data(data));
+            return this.send(Request.post(this._endPoint + "/password_reset/confirm/").data(data));
         };
         Api.prototype.inviteUsers = function (data) {
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/invitations/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/invitations/").data(data.data));
         };
         Api.prototype.acceptInvitation = function (data) {
-            return this.send(Request.post(this._endPoint + "users/invitation/confirm/").data(data));
+            return this.send(Request.post(this._endPoint + "/users/invitation/confirm/").data(data));
         };
         Api.prototype.refuseInvitation = function (data) {
-            return this.send(Request.del(this._endPoint + "users/invitation/confirm/").data(data));
+            return this.send(Request.del(this._endPoint + "/users/invitation/confirm/").data(data));
         };
         Api.prototype.domainInvitations = function (data) {
             return this.send(Request
-                .get(this._endPoint + "domains/" + data.domainId + "/invitations/")
+                .get(this._endPoint + "/domains/" + data.domainId + "/invitations/")
                 .params({ is_complete: "False" }));
         };
         Api.prototype.userInvitations = function () {
             return this.send(Request
-                .get(this._endPoint + "users/self/invitations/")
+                .get(this._endPoint + "/users/self/invitations/")
                 .params({ is_complete: "False" }));
         };
         Api.prototype.domainAccessLog = function (data) {
             return this.send(Request
-                .get(this._endPoint + "domain_access/" + data.domainId + "/events/")
+                .get(this._endPoint + "/domain_access/" + data.domainId + "/events/")
                 .params({ page_size: data.limit }));
         };
         Api.prototype.domainUsers = function (data) {
-            return this.send(Request.get(this._endPoint + "domain_access/" + data.domainId + "/users/"));
+            return this.send(Request.get(this._endPoint + "/domain_access/" + data.domainId + "/users/"));
         };
         Api.prototype.activateUser = function (data) {
-            return this.send(Request.post(this._endPoint + "users/signup/confirm/").data(data));
+            return this.send(Request.post(this._endPoint + "/users/signup/confirm/").data(data));
         };
         Api.prototype.setDomainDefault = function (data) {
-            return this.send(Request.put(this._endPoint + "domain_access/" + data.domainId + "/users/self/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domain_access/" + data.domainId + "/users/self/").data(data.data));
         };
         Api.prototype.resendInvite = function (data) {
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/invitations/" + data.inviteId + "/resend/"));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/invitations/" + data.inviteId + "/resend/"));
         };
         Api.prototype.updateDomainAccess = function (data) {
-            return this.send(Request.put(this._endPoint + "domain_access/" + data.domainId + "/users/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domain_access/" + data.domainId + "/users/").data(data.data));
         };
         Api.prototype.removeUsersFromDomain = function (data) {
-            return this.send(Request.del(this._endPoint + "domain_access/" + data.domainId + "/users/").data(data.data));
+            return this.send(Request.del(this._endPoint + "/domain_access/" + data.domainId + "/users/").data(data.data));
         };
         Api.prototype.getInvitation = function (data) {
-            return this.send(Request.get(this._endPoint + "users/invitations/" + data.token + "/"));
+            return this.send(Request.get(this._endPoint + "/users/invitations/" + data.token + "/"));
         };
         Api.prototype.cancelInvitations = function (data) {
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/invitations/").data(data.data));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/invitations/").data(data.data));
         };
         Api.prototype.getDomainAccessGroups = function (data) {
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/access_groups/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/access_groups/"));
         };
         Api.prototype.getDomainAccessGroup = function (data) {
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.groupId + "/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.groupId + "/"));
         };
         Api.prototype.addDomainAccessGroup = function (data) {
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/access_groups/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/access_groups/").data(data.data));
         };
         Api.prototype.putDomainAgroupMembers = function (data) {
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/members/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/members/").data(data.data));
         };
         Api.prototype.putDomainAgroupPages = function (data) {
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/pages/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/pages/").data(data.data));
         };
         Api.prototype.updateDomainAgroup = function (data) {
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/").data(data.data));
         };
         Api.prototype.deleteDomainAGroup = function (data) {
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/access_groups/" + data.agroupId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/access_groups/" + data.agroupId + "/"));
         };
         Api.prototype.getDomainPageAccess = function (data) {
-            return this.send(Request.get(this._endPoint + "domain_page_access/" + data.domainId + "/"));
+            return this.send(Request.get(this._endPoint + "/domain_page_access/" + data.domainId + "/"));
         };
         Api.prototype.getDomainCustomers = function (data) {
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/customers/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/customers/"));
         };
         Api.prototype.saveDomainPageAccess = function (data) {
-            return this.send(Request.put(this._endPoint + "domain_page_access/" + data.domainId + "/basic/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domain_page_access/" + data.domainId + "/basic/").data(data.data));
         };
         Api.prototype.getTemplates = function (data) {
-            return this.send(Request.get(this._endPoint + "templates/"));
+            return this.send(Request.get(this._endPoint + "/templates/"));
         };
         Api.prototype.saveCustomer = function (data) {
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/customers/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/customers/").data(data.data));
         };
         Api.prototype.updateCustomer = function (data) {
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/customers/" + data.data.id + "/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/customers/" + data.data.id + "/").data(data.data));
         };
         Api.prototype.removeCustomer = function (data) {
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/customers/" + data.customerId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/customers/" + data.customerId + "/"));
         };
         Api.prototype.getDocEmailRules = function (data) {
-            return this.send(Request.get(this._endPoint + "domains/" + data.domainId + "/docsnames/"));
+            return this.send(Request.get(this._endPoint + "/domains/" + data.domainId + "/docsnames/"));
         };
         Api.prototype.createDocEmailRule = function (data) {
-            return this.send(Request.post(this._endPoint + "domains/" + data.domainId + "/docsnames/").data(data.data));
+            return this.send(Request.post(this._endPoint + "/domains/" + data.domainId + "/docsnames/").data(data.data));
         };
         Api.prototype.updateDocEmailRule = function (data) {
-            return this.send(Request.put(this._endPoint + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/").data(data.data));
         };
         Api.prototype.deleteDocEmailRule = function (data) {
-            return this.send(Request.del(this._endPoint + "domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
+            return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
         };
         Api.prototype.send = function (request) {
             var token = this.storage.get("access_token");
