@@ -4,7 +4,8 @@ namespace ipushpull {
     import IModule = angular.IModule;
 
     export interface IIPPConfig {
-        url?: string;
+        api_url?: string;
+        ws_url?: string;
         api_key: string;
         api_secret: string;
         transport?: string;

@@ -7399,7 +7399,7 @@ var ipushpull;
                 });
                 return q.promise;
             };
-            this._endPoint = this.config.url + "/api/1.0/";
+            this._endPoint = this.config.api_url + "/api/1.0/";
         }
         Api.prototype.parseError = function (err, def) {
             var msg = def;
@@ -7930,7 +7930,8 @@ var ipushpull;
     var PageWrap = (function () {
         function PageWrap(q, timeout, interval, ippApi, ippAuth, ippStorage, ippCrypto, ippConf) {
             var defaults = {
-                url: "https://www.ipushpull.com",
+                api_url: "https://www.ipushpull.com/api/1.0",
+                ws_url: "https://www.ipushpull.com"
             };
             $q = q;
             $timeout = timeout;

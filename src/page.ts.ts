@@ -278,7 +278,8 @@ namespace ipushpull {
             // @todo This should not be here
             // @todo Handle last "/" in url
             let defaults: any = {
-                url: "https://www.ipushpull.com",
+                api_url: "https://www.ipushpull.com/api/1.0",
+                ws_url: "https://www.ipushpull.com"
             };
 
             $q = q;

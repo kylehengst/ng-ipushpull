@@ -178,7 +178,7 @@ namespace ipushpull {
         private _locked: boolean = false;
 
         constructor(private $http: IHttpService, private $httpParamSerializerJQLike: IHttpParamSerializer, private $q: IQService, private $injector: IInjectorService, private storage, private config: IIPPConfig){
-            this._endPoint = `${this.config.url}/api/1.0/`;
+            this._endPoint = `${this.config.api_url}/api/1.0/`;
         }
 
         public parseError(err: any, def: string): string {
