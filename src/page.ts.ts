@@ -279,7 +279,7 @@ namespace ipushpull {
             // @todo Handle last "/" in url
             let defaults: any = {
                 api_url: "https://www.ipushpull.com/api/1.0",
-                ws_url: "https://www.ipushpull.com"
+                ws_url: "https://www.ipushpull.com",
             };
 
             $q = q;
@@ -1145,7 +1145,7 @@ namespace ipushpull {
                 return (val.length > 0);
             });
 
-            return io.connect(`${config.url}/page/${this._pageId}`, {
+            return io.connect(`${config.ws_url}/page/${this._pageId}`, {
                 query: query.join("&"),
                 transports: (this.supportsWebSockets()) ? ["websocket"] : ["polling"],
                 forceNew: true,

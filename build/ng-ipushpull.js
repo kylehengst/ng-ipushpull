@@ -688,7 +688,7 @@ var ipushpull;
         function PageWrap(q, timeout, interval, ippApi, ippAuth, ippStorage, ippCrypto, ippConf) {
             var defaults = {
                 api_url: "https://www.ipushpull.com/api/1.0",
-                ws_url: "https://www.ipushpull.com"
+                ws_url: "https://www.ipushpull.com",
             };
             $q = q;
             $timeout = timeout;
@@ -1481,7 +1481,7 @@ var ipushpull;
             query = query.filter(function (val) {
                 return (val.length > 0);
             });
-            return io.connect(config.url + "/page/" + this._pageId, {
+            return io.connect(config.ws_url + "/page/" + this._pageId, {
                 query: query.join("&"),
                 transports: (this.supportsWebSockets()) ? ["websocket"] : ["polling"],
                 forceNew: true,
