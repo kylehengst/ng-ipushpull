@@ -54,7 +54,7 @@ namespace ipushpull {
 
         public get user(): IUserSelf { return this._user; }
 
-        constructor(private $q: IQService, private ippApi: IApiService, private storage, private config: any){
+        constructor(private $q: IQService, private ippApi: IApiService, private storage: IStorageService, private config: any){
             super();
 
             this.on("401", this.on401);

@@ -5,7 +5,6 @@
 
 namespace ipushpull {
     "use strict";
-    import IInjectorService = angular.auto.IInjectorService;
 
     // @todo In progress....
     /*interface IStorageProvider {
@@ -71,14 +70,14 @@ namespace ipushpull {
         }
     }*/
 
-    /*export interface IStorageService {
+    /*export interface IStorageProvider {
         any: () => IStorageProvider;
         cookie: () => IStorageProvider;
         local: () => IStorageProvider;
         memory: () => IStorageProvider;
     }*/
 
-    /*class StorageService implements IStorageService {
+    /*class StorageService implements IStorageProvider {
         public static $inject: string[] = [];
 
         constructor(){
@@ -122,7 +121,7 @@ namespace ipushpull {
         }
     }*/
 
-    export interface IStorageService {
+    export interface IStorageProvider {
         prefix: string;
         suffix: string;
 
@@ -132,7 +131,7 @@ namespace ipushpull {
         remove: (key: string) => void;
     }
 
-    class LocalStorage implements IStorageService{
+    class LocalStorage implements IStorageProvider{
         public prefix: string = "ipp";
         public suffix: string;
 
@@ -185,7 +184,7 @@ namespace ipushpull {
         }
     }
 
-    class CookieStorage implements IStorageService {
+    class CookieStorage implements IStorageProvider {
         public prefix: string = "ipp";
         public suffix: string;
 
@@ -268,29 +267,41 @@ namespace ipushpull {
         }
     }
 
-    // @Todo This is NOT ideal (user should not be aware of persistent or not persistent - should be automatic)
-    ipushpull.module.factory("ippStorageService", ["ippConfig", (config: IIPPConfig) => {
-        // User Storage
-        let userStorage: IStorageService = new LocalStorage();
-        userStorage.suffix = "GUEST";
+    export interface IStorageService {
+        user: IStorageProvider;
+        global: IStorageProvider;
+        persistent: IStorageProvider;
+    }
 
-        // Global storage
-        let globalStorage: IStorageService = new LocalStorage();
+    class StorageService {
+        public static $inject: string[] = ["ippConfig"];
 
-        // Persistent storage
-        // @todo Should log some warning at least
-        let persistentStorage: IStorageService = (navigator.cookieEnabled) ? new CookieStorage() : new LocalStorage();
+        public static bootstrap(ippConfig: IIPPConfig): IStorageService{
+            // User Storage
+            let userStorage: IStorageProvider = new LocalStorage();
+            userStorage.suffix = "GUEST";
 
-        if (config.storage_prefix){
-            userStorage.prefix = config.storage_prefix;
-            globalStorage.prefix = config.storage_prefix;
-            persistentStorage.prefix = config.storage_prefix;
+            // Global storage
+            let globalStorage: IStorageProvider = new LocalStorage();
+
+            // Persistent storage
+            // @todo Should log some warning at least
+            let persistentStorage: IStorageProvider = (navigator.cookieEnabled) ? new CookieStorage() : new LocalStorage();
+
+            if (ippConfig.storage_prefix){
+                userStorage.prefix = ippConfig.storage_prefix;
+                globalStorage.prefix = ippConfig.storage_prefix;
+                persistentStorage.prefix = ippConfig.storage_prefix;
+            }
+
+            return {
+                user: userStorage,
+                global: globalStorage,
+                persistent: persistentStorage,
+            };
         }
+    }
 
-        return {
-            user: userStorage,
-            global: globalStorage,
-            persistent: persistentStorage,
-        };
-    }]);
+    // @Todo This is NOT ideal (user should not be aware of persistent or not persistent - should be automatic)
+    ipushpull.module.factory("ippStorageService", StorageService.bootstrap);
 }

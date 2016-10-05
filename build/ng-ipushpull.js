@@ -1745,20 +1745,27 @@ var ipushpull;
         };
         return CookieStorage;
     }());
-    ipushpull.module.factory("ippStorageService", ["ippConfig", function (config) {
+    var StorageService = (function () {
+        function StorageService() {
+        }
+        StorageService.bootstrap = function (ippConfig) {
             var userStorage = new LocalStorage();
             userStorage.suffix = "GUEST";
             var globalStorage = new LocalStorage();
             var persistentStorage = (navigator.cookieEnabled) ? new CookieStorage() : new LocalStorage();
-            if (config.storage_prefix) {
-                userStorage.prefix = config.storage_prefix;
-                globalStorage.prefix = config.storage_prefix;
-                persistentStorage.prefix = config.storage_prefix;
+            if (ippConfig.storage_prefix) {
+                userStorage.prefix = ippConfig.storage_prefix;
+                globalStorage.prefix = ippConfig.storage_prefix;
+                persistentStorage.prefix = ippConfig.storage_prefix;
             }
             return {
                 user: userStorage,
                 global: globalStorage,
                 persistent: persistentStorage,
             };
-        }]);
+        };
+        StorageService.$inject = ["ippConfig"];
+        return StorageService;
+    }());
+    ipushpull.module.factory("ippStorageService", StorageService.bootstrap);
 })(ipushpull || (ipushpull = {}));
