@@ -7252,6 +7252,17 @@ var ipushpull;
 (function (ipushpull) {
     "use strict";
     ipushpull.module = angular.module("ipushpull", []);
+    ipushpull.module.factory("ippConfig", ["ipushpull_conf", function (cfg) {
+            var defaults = {
+                api_url: "https://www.ipushpull.com/api/1.0",
+                ws_url: "https://www.ipushpull.com",
+            };
+            if (cfg.api_url && !cfg.ws_url) {
+                var parts = cfg.api_url.split("/");
+                defaults.ws_url = parts[0] + "//" + parts[2];
+            }
+            return angular.merge({}, defaults, cfg);
+        }]);
 })(ipushpull || (ipushpull = {}));
 
 var ipushpull;
@@ -7637,7 +7648,7 @@ var ipushpull;
             return this.send(Request.del(this._endPoint + "/domains/" + data.domainId + "/docsnames/" + data.docRuleId + "/"));
         };
         Api.prototype.send = function (request) {
-            var token = this.storage.get("access_token");
+            var token = this.storage.persistent.get("access_token");
             request.headers({
                 "Authorization": "Bearer " + ((token) ? token : "null"),
             });
@@ -7653,7 +7664,7 @@ var ipushpull;
             });
             return r.then(this.handleSuccess, this.handleError);
         };
-        Api.$inject = ["$http", "$httpParamSerializerJQLike", "$q", "$injector", "ippGlobalStorageService", "ipushpull_conf"];
+        Api.$inject = ["$http", "$httpParamSerializerJQLike", "$q", "$injector", "ippStorageService", "ippConfig"];
         return Api;
     }());
     ipushpull.module.service("ippApiService", Api);
@@ -7681,9 +7692,10 @@ var ipushpull;
             this._authInProgress = false;
             this.on401 = function () {
                 _this.ippApi.block();
-                _this.storage.remove("access_token");
+                _this.storage.persistent.remove("access_token");
                 _this.emit(_this.EVENT_RE_LOGGING);
                 _this.authenticate(true).then(function () {
+                    _this.storage.user.suffix = _this._user.id;
                     _this.emit(_this.EVENT_LOGIN_REFRESHED);
                 }, function () {
                     _this.emit(_this.EVENT_ERROR);
@@ -7745,6 +7757,7 @@ var ipushpull;
             this.processAuth().then(function (res) {
                 if (!_this._authenticated) {
                     _this._authenticated = true;
+                    _this.storage.user.suffix = _this._user.id;
                     _this.emit(_this.EVENT_LOGGED_IN);
                 }
                 q.resolve();
@@ -7795,16 +7808,17 @@ var ipushpull;
             return q.promise;
         };
         Auth.prototype.logout = function () {
-            this.storage.remove("access_token");
-            this.storage.remove("refresh_token");
+            this.storage.persistent.remove("access_token");
+            this.storage.persistent.remove("refresh_token");
             this._authenticated = false;
+            this.storage.user.suffix = "GUEST";
             this.emit(this.EVENT_LOGGED_OUT);
         };
         Auth.prototype.processAuth = function () {
             var _this = this;
             var q = this.$q.defer();
-            var accessToken = this.storage.get("access_token");
-            var refreshToken = this.storage.get("refresh_token");
+            var accessToken = this.storage.persistent.get("access_token");
+            var refreshToken = this.storage.persistent.get("refresh_token");
             if (accessToken) {
                 return this.getUserInfo();
             }
@@ -7814,7 +7828,7 @@ var ipushpull;
                         _this.saveTokens(data.data);
                         _this.getUserInfo().then(q.resolve, q.reject);
                     }, function (err) {
-                        _this.storage.remove("refresh_token");
+                        _this.storage.persistent.remove("refresh_token");
                         q.reject(err);
                     });
                 }
@@ -7825,12 +7839,12 @@ var ipushpull;
             return q.promise;
         };
         Auth.prototype.refreshTokens = function () {
-            var refreshToken = this.storage.get("refresh_token");
+            var refreshToken = this.storage.persistent.get("refresh_token");
             return this.ippApi.refreshAccessTokens(refreshToken);
         };
         Auth.prototype.saveTokens = function (tokens) {
-            this.storage.create("access_token", tokens.access_token);
-            this.storage.create("refresh_token", tokens.refresh_token);
+            this.storage.persistent.create("access_token", tokens.access_token, (tokens.expires_in / 86400));
+            this.storage.persistent.create("refresh_token", tokens.refresh_token);
         };
         Auth.prototype.getUserInfo = function () {
             var _this = this;
@@ -7841,7 +7855,7 @@ var ipushpull;
             }, q.reject);
             return q.promise;
         };
-        Auth.$inject = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
+        Auth.$inject = ["$q", "ippApiService", "ippStorageService", "ippConfig"];
         return Auth;
     }(EventEmitter));
     ipushpull.module.service("ippAuthService", Auth);
@@ -7929,10 +7943,6 @@ var ipushpull;
     var $q, $timeout, $interval, api, auth, storage, crypto, config;
     var PageWrap = (function () {
         function PageWrap(q, timeout, interval, ippApi, ippAuth, ippStorage, ippCrypto, ippConf) {
-            var defaults = {
-                api_url: "https://www.ipushpull.com/api/1.0",
-                ws_url: "https://www.ipushpull.com",
-            };
             $q = q;
             $timeout = timeout;
             $interval = interval;
@@ -7940,10 +7950,10 @@ var ipushpull;
             auth = ippAuth;
             storage = ippStorage;
             crypto = ippCrypto;
-            config = angular.merge({}, defaults, ippConf);
+            config = ippConf;
             return Page;
         }
-        PageWrap.$inject = ["$q", "$timeout", "$interval", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
+        PageWrap.$inject = ["$q", "$timeout", "$interval", "ippApiService", "ippAuthService", "ippStorageService", "ippCryptoService", "ippConfig"];
         return PageWrap;
     }());
     ipushpull.module.service("ippPageService", PageWrap);
@@ -8719,7 +8729,7 @@ var ipushpull;
         };
         ProviderSocket.prototype.connect = function () {
             var query = [
-                ("access_token=" + storage.get("access_token")),
+                ("access_token=" + storage.persistent.get("access_token")),
             ];
             query = query.filter(function (val) {
                 return (val.length > 0);
@@ -8914,22 +8924,84 @@ var ipushpull;
         };
         return LocalStorage;
     }());
-    ipushpull.module.service("ippUserStorageService", ["ippAuthService", "ipushpull_conf", function (ippAuth, config) {
-            var storage = new LocalStorage();
-            storage.suffix = "GUEST";
-            if (config.storage_prefix) {
-                storage.prefix = config.storage_prefix;
+    var CookieStorage = (function () {
+        function CookieStorage() {
+            this.prefix = "ipp";
+            this._domain = document.domain.replace(/(www)|(test)|(stable)/, "");
+        }
+        CookieStorage.prototype.create = function (key, value, expireDays) {
+            var expires = "";
+            if (expireDays) {
+                var date = new Date();
+                date.setTime(date.getTime() + (expireDays * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toGMTString();
             }
-            ippAuth.on("logged_in", function () {
-                storage.suffix = "" + ippAuth.user.id;
-            });
-            return storage;
-        }]);
-    ipushpull.module.service("ippGlobalStorageService", ["ipushpull_conf", function (config) {
-            var storage = new LocalStorage();
-            if (config.storage_prefix) {
-                storage.prefix = config.storage_prefix;
+            document.cookie = this.makeKey(key) + "=" + value + expires + "; path=/; domain=" + this._domain + (this.isSecure() ? ";secure;" : "");
+        };
+        CookieStorage.prototype.save = function (key, value, expireDays) {
+            this.create(key, value, expireDays);
+        };
+        CookieStorage.prototype.get = function (key, defaultValue) {
+            key = this.makeKey(key);
+            var nameEQ = key + "=";
+            var ca = document.cookie.split(";");
+            for (var i = 0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0) === " ") {
+                    c = c.substring(1, c.length);
+                }
+                if (c.indexOf(nameEQ) === 0) {
+                    var val = c.substring(nameEQ.length, c.length);
+                    if (this.isValidJSON(val)) {
+                        return JSON.parse(val);
+                    }
+                    else {
+                        return val;
+                    }
+                }
             }
-            return storage;
+            return;
+        };
+        CookieStorage.prototype.remove = function (key) {
+            this.create(this.makeKey(key), "", -1);
+        };
+        CookieStorage.prototype.isSecure = function () {
+            return window.location.protocol === "https:";
+        };
+        CookieStorage.prototype.makeKey = function (key) {
+            if (this.prefix && key.indexOf(this.prefix) !== 0) {
+                key = this.prefix + "_" + key;
+            }
+            if (this.suffix) {
+                key = key + "_" + this.suffix;
+            }
+            return key;
+        };
+        CookieStorage.prototype.isValidJSON = function (val) {
+            try {
+                var json = JSON.parse(val);
+                return true;
+            }
+            catch (e) {
+                return false;
+            }
+        };
+        return CookieStorage;
+    }());
+    ipushpull.module.factory("ippStorageService", ["ippConfig", function (config) {
+            var userStorage = new LocalStorage();
+            userStorage.suffix = "GUEST";
+            var globalStorage = new LocalStorage();
+            var persistentStorage = (navigator.cookieEnabled) ? new CookieStorage() : new LocalStorage();
+            if (config.storage_prefix) {
+                userStorage.prefix = config.storage_prefix;
+                globalStorage.prefix = config.storage_prefix;
+                persistentStorage.prefix = config.storage_prefix;
+            }
+            return {
+                user: userStorage,
+                global: globalStorage,
+                persistent: persistentStorage,
+            };
         }]);
 })(ipushpull || (ipushpull = {}));

@@ -39,7 +39,7 @@ namespace ipushpull {
     }
 
     class Auth extends EventEmitter {
-        public static $inject: string[] = ["$q", "ippApiService", "ippGlobalStorageService", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "ippApiService", "ippStorageService", "ippConfig"];
 
         public get EVENT_LOGGED_IN(): string { return "logged_in"; } // emitted when logged in (not on login refresh)
         public get EVENT_RE_LOGGING(): string { return "re_logging"; } // emitted when re-logging started
@@ -79,6 +79,10 @@ namespace ipushpull {
             this.processAuth().then((res) => {
                 if (!this._authenticated) {
                     this._authenticated = true;
+
+                    // @todo oh no....
+                    this.storage.user.suffix = this._user.id;
+
                     this.emit(this.EVENT_LOGGED_IN);
                 }
 
@@ -137,10 +141,13 @@ namespace ipushpull {
         }
 
         public logout(): void{
-            this.storage.remove("access_token");
-            this.storage.remove("refresh_token");
+            this.storage.persistent.remove("access_token");
+            this.storage.persistent.remove("refresh_token");
 
             this._authenticated = false;
+
+            // @todo oh no....
+            this.storage.user.suffix = "GUEST";
 
             this.emit(this.EVENT_LOGGED_OUT);
         }
@@ -148,8 +155,8 @@ namespace ipushpull {
         private processAuth(): IPromise<any> {
             let q: IDeferred<any> = this.$q.defer();
 
-            let accessToken: string = this.storage.get("access_token");
-            let refreshToken: string = this.storage.get("refresh_token");
+            let accessToken: string = this.storage.persistent.get("access_token");
+            let refreshToken: string = this.storage.persistent.get("refresh_token");
 
             if (accessToken){
                  return this.getUserInfo();
@@ -159,7 +166,7 @@ namespace ipushpull {
                         this.saveTokens(data.data);
                         this.getUserInfo().then(q.resolve, q.reject);
                     }, (err) => {
-                        this.storage.remove("refresh_token");
+                        this.storage.persistent.remove("refresh_token");
                         q.reject(err);
                     });
                 } else {
@@ -171,14 +178,14 @@ namespace ipushpull {
         }
 
         private refreshTokens(): IPromise<any> {
-            let refreshToken: string = this.storage.get("refresh_token");
+            let refreshToken: string = this.storage.persistent.get("refresh_token");
 
             return this.ippApi.refreshAccessTokens(refreshToken);
         }
 
         private saveTokens(tokens: any): void {
-            this.storage.create("access_token", tokens.access_token);
-            this.storage.create("refresh_token", tokens.refresh_token);
+            this.storage.persistent.create("access_token", tokens.access_token, (tokens.expires_in / 86400));
+            this.storage.persistent.create("refresh_token", tokens.refresh_token);
         }
 
         private getUserInfo(): IPromise<IUserSelf> {
@@ -197,12 +204,15 @@ namespace ipushpull {
             this.ippApi.block();
 
             // Remove access token
-            this.storage.remove("access_token");
+            this.storage.persistent.remove("access_token");
 
             this.emit(this.EVENT_RE_LOGGING); // @todo do we need this?
 
             // Try to authenticate
             this.authenticate(true).then(() => {
+                // @todo oh no....
+                this.storage.user.suffix = this._user.id;
+
                 this.emit(this.EVENT_LOGIN_REFRESHED);
             }, () => {
                 this.emit(this.EVENT_ERROR);

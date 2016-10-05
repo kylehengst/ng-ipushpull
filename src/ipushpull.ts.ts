@@ -26,4 +26,19 @@ namespace ipushpull {
 
         $rootScope.uuid = uuid;
     }]);*/
+
+    module.factory("ippConfig", ["ipushpull_conf", (cfg: IIPPConfig) => {
+        let defaults: any = {
+            api_url: "https://www.ipushpull.com/api/1.0",
+            ws_url: "https://www.ipushpull.com",
+        };
+
+        // @todo Still not correct - do this better
+        if (cfg.api_url && !cfg.ws_url){
+            let parts: string[] = cfg.api_url.split("/");
+            defaults.ws_url = parts[0] + "//" + parts[2];
+        }
+
+        return angular.merge({}, defaults, cfg);
+    }]);
 }

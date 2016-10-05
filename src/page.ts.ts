@@ -263,7 +263,7 @@ namespace ipushpull {
     let $q: IQService, $timeout: ITimeoutService, $interval: IIntervalService, api: IApiService, auth: IAuthService, storage: IStorageService, crypto: ICryptoService, config: IIPPConfig;
 
     class PageWrap {
-        public static $inject: string[] = ["$q", "$timeout", "$interval", "ippApiService", "ippAuthService", "ippGlobalStorageService", "ippCryptoService", "ipushpull_conf"];
+        public static $inject: string[] = ["$q", "$timeout", "$interval", "ippApiService", "ippAuthService", "ippStorageService", "ippCryptoService", "ippConfig"];
 
         constructor(
             q: IQService,
@@ -275,13 +275,6 @@ namespace ipushpull {
             ippCrypto: ICryptoService,
             ippConf: IIPPConfig){
 
-            // @todo This should not be here
-            // @todo Handle last "/" in url
-            let defaults: any = {
-                api_url: "https://www.ipushpull.com/api/1.0",
-                ws_url: "https://www.ipushpull.com",
-            };
-
             $q = q;
             $timeout = timeout;
             $interval = interval;
@@ -289,7 +282,7 @@ namespace ipushpull {
             auth = ippAuth;
             storage = ippStorage;
             crypto = ippCrypto;
-            config = angular.merge({}, defaults, ippConf);
+            config = ippConf;
 
             return Page;
         }
@@ -1138,7 +1131,7 @@ namespace ipushpull {
 
         private connect(): Socket {
             let query: string[] = [
-                `access_token=${storage.get("access_token")}`,
+                `access_token=${storage.persistent.get("access_token")}`,
             ];
 
             query = query.filter((val: string) => {

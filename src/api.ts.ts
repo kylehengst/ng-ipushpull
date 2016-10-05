@@ -172,7 +172,7 @@ namespace ipushpull {
     }
 
     class Api implements IApiService {
-        public static $inject: string[] = ["$http", "$httpParamSerializerJQLike", "$q", "$injector", "ippGlobalStorageService", "ipushpull_conf"];
+        public static $inject: string[] = ["$http", "$httpParamSerializerJQLike", "$q", "$injector", "ippStorageService", "ippConfig"];
 
         private _endPoint: string;
         private _locked: boolean = false;
@@ -498,7 +498,7 @@ namespace ipushpull {
 
         private send(request: Request): IPromise<IRequestResult> {
             // Add auth header
-            let token: string = this.storage.get("access_token");
+            let token: string = this.storage.persistent.get("access_token");
             request.headers({
                 "Authorization": `Bearer ${(token) ? token : "null"}`,
             });

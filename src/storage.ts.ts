@@ -1,12 +1,11 @@
 /**
- *
- * @todo Add expire field to cookie provider
- * @todo Somehow configurable prefix
+ * Todos
  * @todo Well... overall better/proper implementation
  */
 
 namespace ipushpull {
     "use strict";
+    import IInjectorService = angular.auto.IInjectorService;
 
     // @todo In progress....
     /*interface IStorageProvider {
@@ -14,13 +13,13 @@ namespace ipushpull {
         get: (key: string, defaultValue: any) => string;
         remove: (key: string) => void;
         global: () => void;
-    }
+    }*/
 
-    interface ICookieProvider extends IStorageProvider {
+    /*interface ICookieProvider extends IStorageProvider {
         expire: (days: number) => void;
-    }
+    }*/
 
-    class StorageProvider{
+    /*class StorageProvider{
         private _prefix: string = "ipp_";
         private _suffix: string = "GUEST";
 
@@ -40,66 +39,9 @@ namespace ipushpull {
 
             return `${key}_${this._suffix}`;
         }
-    }
+    }*/
 
-    class Cookies extends StorageProvider implements ICookieProvider {
-        private _domain: string;
-        private _expire: number;
-
-        constructor(){
-            super();
-
-            // @todo There is pretty much no way to generalize this....
-            this._domain = document.domain.replace(/(www)|(test)|(stable)/, "");
-        }
-
-        public expire(days: number): IStorageProvider {
-            this._expire = days;
-            return this;
-        }
-
-        public create(key: string, value: string): void {
-            let expires: string = "";
-
-            if (this._expire) {
-                let date: Date = new Date();
-                date.setTime(date.getTime() + (this._expire * 24 * 60 * 60 * 1000));
-                expires = "; expires=" + date.toGMTString();
-            }
-
-            document.cookie = `${this.makeKey(key)}=${value}${expires}; path=/; domain=${this._domain}${(this.isSecure() ? ";secure;" : "")}`;
-        }
-
-        public get(key: string, defaultValue: any): string {
-            key = this.makeKey(key);
-
-            let nameEQ: string = key + "=";
-            let ca: string[] = document.cookie.split(";");
-
-            for (let i: number = 0; i < ca.length; i++) {
-                let c: string = ca[i];
-                while (c.charAt(0) === " "){
-                    c = c.substring(1, c.length);
-                }
-
-                if (c.indexOf(nameEQ) === 0){
-                    return c.substring(nameEQ.length, c.length);
-                }
-            }
-
-            return;
-        }
-
-        public remove(key: string): void {
-            new Cookies().expire(-1).create(this.makeKey(key), "");
-        }
-
-        private isSecure(): boolean{
-            return window.location.protocol === "https:";
-        }
-    }
-
-    class LocalStorage extends StorageProvider implements IStorageProvider {
+    /*class LocalStorage extends StorageProvider implements IStorageProvider {
         public create(key: string, value: string): void {
             localStorage.setItem(this.makeKey(key), value);
         }
@@ -111,9 +53,9 @@ namespace ipushpull {
         public remove(key: string): void {
             localStorage.removeItem(this.makeKey(key));
         }
-    }
+    }*/
 
-    class Memory extends StorageProvider implements IStorageProvider {
+    /*class Memory extends StorageProvider implements IStorageProvider {
         private _storage: any = {};
 
         public create(key: string, value: string): void {
@@ -127,16 +69,16 @@ namespace ipushpull {
         public remove(key: string): void {
             delete this._storage[this.makeKey(key)];
         }
-    }
+    }*/
 
-    export interface IStorageService {
+    /*export interface IStorageService {
         any: () => IStorageProvider;
         cookie: () => IStorageProvider;
         local: () => IStorageProvider;
         memory: () => IStorageProvider;
-    }
+    }*/
 
-    class StorageService implements IStorageService {
+    /*class StorageService implements IStorageService {
         public static $inject: string[] = [];
 
         constructor(){
@@ -184,8 +126,8 @@ namespace ipushpull {
         prefix: string;
         suffix: string;
 
-        create: (key: string, value: string) => void;
-        save: (key: string, value: string) => void;
+        create: (key: string, value: string, expireDays?: number) => void;
+        save: (key: string, value: string, expireDays?: number) => void;
         get: (key: string, defaultValue?: any) => any;
         remove: (key: string) => void;
     }
@@ -243,28 +185,112 @@ namespace ipushpull {
         }
     }
 
-    ipushpull.module.service("ippUserStorageService", ["ippAuthService", "ipushpull_conf", (ippAuth: IAuthService, config: IIPPConfig) => {
-        let storage: IStorageService =  new LocalStorage();
-        storage.suffix = "GUEST";
+    class CookieStorage implements IStorageService {
+        public prefix: string = "ipp";
+        public suffix: string;
 
-        if (config.storage_prefix){
-            storage.prefix = config.storage_prefix;
+        private _domain: string;
+
+        constructor(){
+            // @todo There is pretty much no way to generalize this.... - Really?
+            this._domain = document.domain.replace(/(www)|(test)|(stable)/, "");
         }
 
-        ippAuth.on("logged_in", () => {
-            storage.suffix = `${ippAuth.user.id}`;
-        });
+        public create(key: string, value: string, expireDays?: number): void {
+            let expires: string = "";
 
-        return storage;
-    }]);
+            if (expireDays) {
+                let date: Date = new Date();
+                date.setTime(date.getTime() + (expireDays * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toGMTString();
+            }
 
-    ipushpull.module.service("ippGlobalStorageService", ["ipushpull_conf", (config: IIPPConfig) => {
-        let storage: IStorageService =  new LocalStorage();
-
-        if (config.storage_prefix){
-            storage.prefix = config.storage_prefix;
+            document.cookie = `${this.makeKey(key)}=${value}${expires}; path=/; domain=${this._domain}${(this.isSecure() ? ";secure;" : "")}`;
         }
 
-        return storage;
+        public save(key: string, value: string, expireDays?: number): void{
+            this.create(key, value, expireDays);
+        }
+
+        public get(key: string, defaultValue: any): string {
+            key = this.makeKey(key);
+
+            let nameEQ: string = key + "=";
+            let ca: string[] = document.cookie.split(";");
+
+            for (let i: number = 0; i < ca.length; i++) {
+                let c: string = ca[i];
+                while (c.charAt(0) === " "){
+                    c = c.substring(1, c.length);
+                }
+
+                if (c.indexOf(nameEQ) === 0){
+                    let val: string = c.substring(nameEQ.length, c.length);
+
+                    if (this.isValidJSON(val)){
+                        return JSON.parse(val);
+                    } else {
+                        return val;
+                    }
+                }
+            }
+
+            return;
+        }
+
+        public remove(key: string): void {
+            this.create(this.makeKey(key), "", -1);
+        }
+
+        private isSecure(): boolean{
+            return window.location.protocol === "https:";
+        }
+
+        private makeKey(key: string): string{
+            if (this.prefix && key.indexOf(this.prefix) !== 0) {
+                key = `${this.prefix}_${key}`;
+            }
+
+            if (this.suffix) {
+                key = `${key}_${this.suffix}`;
+            }
+
+            return key;
+        }
+
+        private isValidJSON(val: any): boolean{
+            try{
+                let json: any = JSON.parse(val);
+                return true;
+            } catch (e){
+                return false;
+            }
+        }
+    }
+
+    // @Todo This is NOT ideal (user should not be aware of persistent or not persistent - should be automatic)
+    ipushpull.module.factory("ippStorageService", ["ippConfig", (config: IIPPConfig) => {
+        // User Storage
+        let userStorage: IStorageService = new LocalStorage();
+        userStorage.suffix = "GUEST";
+
+        // Global storage
+        let globalStorage: IStorageService = new LocalStorage();
+
+        // Persistent storage
+        // @todo Should log some warning at least
+        let persistentStorage: IStorageService = (navigator.cookieEnabled) ? new CookieStorage() : new LocalStorage();
+
+        if (config.storage_prefix){
+            userStorage.prefix = config.storage_prefix;
+            globalStorage.prefix = config.storage_prefix;
+            persistentStorage.prefix = config.storage_prefix;
+        }
+
+        return {
+            user: userStorage,
+            global: globalStorage,
+            persistent: persistentStorage,
+        };
     }]);
 }
