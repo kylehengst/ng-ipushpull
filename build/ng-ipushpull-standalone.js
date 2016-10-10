@@ -8235,6 +8235,7 @@ var ipushpull;
             this._provider.on("content_update", function (data) {
                 data.special_page_type = _this.updatePageType(data.special_page_type);
                 _this._data = angular.merge({}, _this._data, data);
+                _this._data.content = data.content;
                 _this.decrypt();
                 _this._contentLoaded = true;
                 _this.checkReady();

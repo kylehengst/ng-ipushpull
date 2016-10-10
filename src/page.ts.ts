@@ -604,6 +604,10 @@ namespace ipushpull {
 
                 this._data = angular.merge({}, this._data, data);
 
+                // We need to force override of content otherwise styles were being merged
+                // @todo This is temporary solution, something better will be introduced later on
+                this._data.content = data.content;
+
                 this.decrypt();
 
                 this._contentLoaded = true;
