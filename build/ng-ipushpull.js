@@ -169,30 +169,6 @@ var ipushpull;
             };
             this._endPoint = "" + this.config.api_url;
         }
-        Api.prototype.parseError = function (err, def) {
-            var msg = def;
-            if (err.data) {
-                var keys = Object.keys(err.data);
-                if (keys.length) {
-                    if (angular.isArray(err.data[keys[0]])) {
-                        msg = err.data[keys[0]][0];
-                    }
-                    else if (typeof err.data[keys[0]] === "string") {
-                        msg = err.data[keys[0]];
-                    }
-                    else {
-                        msg = def;
-                    }
-                }
-                else {
-                    msg = def;
-                }
-            }
-            else {
-                msg = def;
-            }
-            return msg;
-        };
         Api.prototype.block = function () {
             this._locked = true;
         };
@@ -267,7 +243,7 @@ var ipushpull;
         Api.prototype.createPage = function (data) {
             return this.send(Request
                 .post(this._endPoint + "/domains/" + data.domainId + "/pages/")
-                .data({ name: data.data.name }));
+                .data(data.data));
         };
         Api.prototype.savePageContent = function (data) {
             return this.send(Request
@@ -555,7 +531,7 @@ var ipushpull;
                             err.message = err.data.error_description;
                             break;
                         default:
-                            err.message = _this.ippApi.parseError(err.data, "Unknown error");
+                            err.message = ipushpull.Utils.parseApiError(err.data, "Unknown error");
                             break;
                     }
                 }
@@ -832,6 +808,7 @@ var ipushpull;
             configurable: true
         });
         Page.create = function (folderId, name, type, template) {
+            if (type === void 0) { type = 0; }
             var q = $q.defer();
             if (template) {
                 var page_1 = new Page(template.id, template.domain_id);
@@ -908,7 +885,7 @@ var ipushpull;
                 pageId: this._pageId,
                 data: data,
             }).then(q.resolve, function (err) {
-                q.reject(api.parseError(err, "Could not save page settings"));
+                q.reject(ipushpull.Utils.parseApiError(err, "Could not save page settings"));
             });
             return q.promise;
         };
@@ -1768,4 +1745,39 @@ var ipushpull;
         return StorageService;
     }());
     ipushpull.module.factory("ippStorageService", StorageService.bootstrap);
+})(ipushpull || (ipushpull = {}));
+
+var ipushpull;
+(function (ipushpull) {
+    "use strict";
+    var Utils = (function () {
+        function Utils() {
+        }
+        Utils.parseApiError = function (err, def) {
+            var msg = def;
+            if (err.data) {
+                var keys = Object.keys(err.data);
+                if (keys.length) {
+                    if (angular.isArray(err.data[keys[0]])) {
+                        msg = err.data[keys[0]][0];
+                    }
+                    else if (typeof err.data[keys[0]] === "string") {
+                        msg = err.data[keys[0]];
+                    }
+                    else {
+                        msg = def;
+                    }
+                }
+                else {
+                    msg = def;
+                }
+            }
+            else {
+                msg = def;
+            }
+            return msg;
+        };
+        return Utils;
+    }());
+    ipushpull.Utils = Utils;
 })(ipushpull || (ipushpull = {}));

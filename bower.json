@@ -27,7 +27,8 @@
     "Gruntfile.js",
     "node_modules",
     "components",
-    "src"
+    "src",
+    "build/index.d.ts"
   ],
   "dependencies": {
     "angular": ">= 1.2.0",

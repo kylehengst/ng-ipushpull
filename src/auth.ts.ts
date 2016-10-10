@@ -128,7 +128,7 @@ namespace ipushpull {
                             err.message = err.data.error_description;
                             break;
                         default :
-                            err.message = this.ippApi.parseError(err.data, "Unknown error");
+                            err.message = ipushpull.Utils.parseApiError(err.data, "Unknown error");
                             break;
                     }
                 }

@@ -181,30 +181,6 @@ namespace ipushpull {
             this._endPoint = `${this.config.api_url}`;
         }
 
-        public parseError(err: any, def: string): string {
-            let msg: string = def;
-
-            if (err.data){
-                let keys: string[] = Object.keys(err.data);
-                if (keys.length){
-                    if (angular.isArray(err.data[keys[0]])){
-                        msg = err.data[keys[0]][0];
-                    } else if (typeof err.data[keys[0]] === "string"){
-                        msg = err.data[keys[0]];
-                    } else {
-                        msg = def;
-                    }
-
-                } else {
-                    msg = def;
-                }
-            } else {
-                msg = def;
-            }
-
-            return msg;
-        }
-
         public block(): void {
             this._locked = true;
         }
@@ -304,7 +280,7 @@ namespace ipushpull {
             return this.send(
                 Request
                     .post(this._endPoint + "/domains/" + data.domainId + "/pages/")
-                    .data({name: data.data.name})
+                    .data(data.data)
             );
         }
 

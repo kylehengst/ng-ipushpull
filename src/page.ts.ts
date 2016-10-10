@@ -43,8 +43,8 @@ namespace ipushpull {
     }
 
     export interface IPageContentCell {
-        value: string | number;
-        formatted_value: string | number;
+        value: string;
+        formatted_value: string;
         link?: IPageContentLink;
         style?: IPageCellStyle;
     }
@@ -341,7 +341,7 @@ namespace ipushpull {
             passphrase: "",
         };
 
-        public static create(folderId: number, name: string, type: number, template?: IPageTemplate): IPromise<IPageService>{
+        public static create(folderId: number, name: string, type: number = 0, template?: IPageTemplate): IPromise<IPageService>{
             let q: IDeferred<IPageService> = $q.defer();
 
             if (template){
@@ -362,6 +362,7 @@ namespace ipushpull {
                     },
                 }).then((res) => {
                     // Start new page
+                    // @todo Why ?
                     let page: IPageService = new Page(res.data.id, folderId);
                     page.on(page.EVENT_READY, () => {
                         page.stop();
@@ -455,7 +456,7 @@ namespace ipushpull {
                 pageId: this._pageId,
                 data: data,
             }).then(q.resolve, (err) => {
-                q.reject(api.parseError(err, "Could not save page settings"));
+                q.reject(ipushpull.Utils.parseApiError(err, "Could not save page settings"));
             });
 
             return q.promise;

@@ -31,8 +31,8 @@ declare namespace ipushpull {
         "lbw"?: string;
     }
     interface IPageContentCell {
-        value: string | number;
-        formatted_value: string | number;
+        value: string;
+        formatted_value: string;
         link?: IPageContentLink;
         style?: IPageCellStyle;
     }

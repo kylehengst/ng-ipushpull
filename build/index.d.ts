@@ -1333,8 +1333,8 @@ declare namespace ipushpull {
         "lbw"?: string;
     }
     interface IPageContentCell {
-        value: string | number;
-        formatted_value: string | number;
+        value: string;
+        formatted_value: string;
         link?: IPageContentLink;
         style?: IPageCellStyle;
     }
@@ -1580,5 +1580,11 @@ declare namespace ipushpull {
         user: IStorageProvider;
         global: IStorageProvider;
         persistent: IStorageProvider;
+    }
+}
+
+declare namespace ipushpull {
+    class Utils {
+        static parseApiError(err: any, def: string): string;
     }
 }
