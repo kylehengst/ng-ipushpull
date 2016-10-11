@@ -526,7 +526,7 @@ namespace ipushpull {
             }
 
             // Create new page
-            Page.create(this._folderId, name, this._data.special_page_type).then((newPage: IPageService) => {
+            Page.create(folderId, name, this._data.special_page_type).then((newPage: IPageService) => {
                 $q.all([
                     // @todo Save settings
                     newPage.push(this._data.content, false), // Push content
