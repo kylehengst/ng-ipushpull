@@ -1303,6 +1303,16 @@ declare namespace ipushpull {
 declare namespace ipushpull {
     import IPromise = angular.IPromise;
     import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    interface IPageTypes {
+        regular: number;
+        pageAccessReport: number;
+        domainUsageReport: number;
+        globalUsageReport: number;
+        pageUpdateReport: number;
+        alert: number;
+        pdf: number;
+        liveUsage: number;
+    }
     interface IPageContentLink {
         external: boolean;
         address: string;
@@ -1584,7 +1594,8 @@ declare namespace ipushpull {
 }
 
 declare namespace ipushpull {
-    class Utils {
-        static parseApiError(err: any, def: string): string;
+    interface IUtils {
+        parseApiError: (err: any, def: string) => string;
     }
+    let Utils: IUtils;
 }
