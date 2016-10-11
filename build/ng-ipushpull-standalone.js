@@ -8179,7 +8179,7 @@ var ipushpull;
             if (options.clone_ranges && this._folderId !== folderId) {
                 options.clone_ranges = false;
             }
-            Page.create(this._folderId, name, this._data.special_page_type).then(function (newPage) {
+            Page.create(folderId, name, this._data.special_page_type).then(function (newPage) {
                 $q.all([
                     newPage.push(_this._data.content, false),
                 ]).then(function (res) {
