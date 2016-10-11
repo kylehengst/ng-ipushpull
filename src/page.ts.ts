@@ -597,6 +597,19 @@ namespace ipushpull {
         }
 
         /**
+         * Deletes current page
+         * @returns {IPromise<IRequestResult>}
+         */
+        public del(): IPromise<any>{
+            let requestData: any = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+            };
+
+            return api.deletePage(requestData);
+        }
+
+        /**
          * Check if page is encrypted and decrypt it if it is
          * @param key
          */
