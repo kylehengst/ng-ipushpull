@@ -1,8 +1,12 @@
 namespace ipushpull {
     "use strict";
 
-    export class Utils {
-        public static parseApiError(err: any, def: string): string {
+    export interface IUtils {
+        parseApiError: (err: any, def: string) => string;
+    }
+
+    class UtilsProvider implements IUtils {
+        public parseApiError(err: any, def: string): string {
             let msg: string = def;
 
             if (err.data){
@@ -26,4 +30,6 @@ namespace ipushpull {
             return msg;
         }
     }
+
+    export let Utils: IUtils = new UtilsProvider();
 }

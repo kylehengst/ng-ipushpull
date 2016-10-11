@@ -556,6 +556,11 @@ namespace ipushpull {
             // Remove access rights (if any)
             delete data.access_rights;
 
+            // Just a small condition - this seems to be left behind quite often
+            if (data.encryption_type_to_use === 0){
+                data.encryption_key_to_use = "";
+            }
+
             // @todo Validation
             api.savePageSettings({
                 domainId: this._folderId,
@@ -564,6 +569,29 @@ namespace ipushpull {
             }).then(q.resolve, (err) => {
                 q.reject(ipushpull.Utils.parseApiError(err, "Could not save page settings"));
             });
+
+            return q.promise;
+        }
+
+        /**
+         * Sets current page as folders default for current user
+         * @returns {IPromise<IRequestResult>}
+         */
+        public setAsFoldersDefault(): IPromise<any>{
+            let q: IDeferred<any> = $q.defer();
+
+            let requestData: any = {
+                domainId: this._folderId,
+                data: {
+                    default_page_id: this._pageId,
+                },
+            };
+
+            api.setDomainDefault(requestData).then((res) => {
+                // @todo probably not a best way to do that, but is there any other option?
+                this._access.is_users_default_page = true;
+                q.resolve(res);
+            }, q.reject);
 
             return q.promise;
         }
@@ -793,7 +821,7 @@ namespace ipushpull {
 
             // If encrypted
             if (this._data.encryption_type_to_use) {
-                if (!this._encryptionKeyPull || this._data.encryption_key_to_use !== this._encryptionKeyPush.name){
+                if (!this._encryptionKeyPush || this._data.encryption_key_to_use !== this._encryptionKeyPush.name){
                     // @todo Proper error
                     q.reject("None or wrong encryption key");
                     return q.promise;
@@ -805,6 +833,9 @@ namespace ipushpull {
                     this._data.encrypted_content = encrypted;
                     this._data.encryption_type_used = 1;
                     this._data.encryption_key_used = this._encryptionKeyPush.name;
+
+                    // Ehm...
+                    this._encryptionKeyPull = angular.copy(this._encryptionKeyPush);
                 } else {
                     // @todo proper error
                     q.reject("Encryption failed");
@@ -818,7 +849,7 @@ namespace ipushpull {
             }
 
             let data: any = {
-                content: this._data.content,
+                content: (!this._data.encryption_type_used) ? this._data.content : "",
                 encrypted_content: this._data.encrypted_content,
                 encryption_type_used: this._data.encryption_type_used,
                 encryption_key_used: this._data.encryption_key_used,

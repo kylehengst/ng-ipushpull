@@ -1,5 +1,6 @@
 declare namespace ipushpull {
-    class Utils {
-        static parseApiError(err: any, def: string): string;
+    interface IUtils {
+        parseApiError: (err: any, def: string) => string;
     }
+    let Utils: IUtils;
 }
