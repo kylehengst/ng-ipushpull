@@ -8338,6 +8338,13 @@ var ipushpull;
             }, q.reject);
             return q.promise;
         };
+        Page.prototype.del = function () {
+            var requestData = {
+                domainId: this._folderId,
+                pageId: this._pageId,
+            };
+            return api.deletePage(requestData);
+        };
         Page.prototype.decrypt = function (key) {
             if (!key) {
                 key = this._encryptionKeyPull;
