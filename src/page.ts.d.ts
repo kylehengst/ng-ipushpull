@@ -1,6 +1,16 @@
 declare namespace ipushpull {
     import IPromise = angular.IPromise;
     import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    interface IPageTypes {
+        regular: number;
+        pageAccessReport: number;
+        domainUsageReport: number;
+        globalUsageReport: number;
+        pageUpdateReport: number;
+        alert: number;
+        pdf: number;
+        liveUsage: number;
+    }
     interface IPageContentLink {
         external: boolean;
         address: string;

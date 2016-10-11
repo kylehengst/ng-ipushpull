@@ -11,6 +11,17 @@ namespace ipushpull {
     import IPromise = angular.IPromise;
     import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
 
+    export interface IPageTypes {
+        regular: number;
+        pageAccessReport: number;
+        domainUsageReport: number;
+        globalUsageReport: number;
+        pageUpdateReport: number;
+        alert: number;
+        pdf: number;
+        liveUsage: number;
+    }
+
     export interface IPageContentLink {
         external: boolean;
         address: string;
@@ -307,19 +318,65 @@ namespace ipushpull {
         public get EVENT_ACCESS_UPDATED(): string { return "access_updated"; }
         public get EVENT_ERROR(): string { return "error"; }
 
+        /**
+         * Indicates when page is ready (both content and settings/meta are loaded)
+         * @type {boolean}
+         */
         public ready: boolean = false;
+
+        /**
+         * Indicates if page is decrypted.
+         * @type {boolean}
+         */
         public decrypted: boolean = true;
+
+        /**
+         * Indicates if page updates are on - page is requesting/receiving new updates
+         * @type {boolean}
+         */
         public updatesOn: boolean = true; // @todo I dont like this...
-        public types: any;
 
-        public Ranges;
+        /**
+         * Mapping list of page types label - id
+         * @type {IPageTypes}
+         */
+        public types: IPageTypes;
 
+        /**
+         * Class for page range manipulation
+         * @type {IPageRangesCollection}
+         */
+        public Ranges: IPageRangesCollection;
+
+        /**
+         * Indicates if client supports websockets
+         * @type {boolean}
+         * @private
+         */
         private _supportsWS: boolean = true; // let's be optimistic by default
+
+        /**
+         * Object that holds page data provider
+         * @type {IPageProvider}
+         */
         private _provider: IPageProvider;
 
+        /**
+         * Object that holds the setInterval object for requesting page access data
+         * @type {number}
+         */
         private _accessInterval: IPromise<any>;
 
+        /**
+         * Holds page content and page meta together
+         * @type {IPage}
+         */
         private _data: IPage;
+
+        /**
+         * Holds page access values
+         * @type {IUserPageAccess}
+         */
         private _access: IUserPageAccess;
 
         private _pageId: number;
@@ -335,12 +392,20 @@ namespace ipushpull {
             name: "",
             passphrase: "",
         };
-
         private _encryptionKeyPush: IEncryptionKey = {
             name: "",
             passphrase: "",
         };
 
+        /**
+         * Creates new page in the system
+         *
+         * @param folderId
+         * @param name
+         * @param type
+         * @param template
+         * @returns {IPromise<IPageService>}
+         */
         public static create(folderId: number, name: string, type: number = 0, template?: IPageTemplate): IPromise<IPageService>{
             let q: IDeferred<IPageService> = $q.defer();
 
@@ -376,6 +441,12 @@ namespace ipushpull {
             return q.promise;
         };
 
+        /**
+         * Starts new page object
+         *
+         * @param pageId
+         * @param folderId
+         */
         constructor(pageId: number | string, folderId: number | string){
             super();
 
@@ -421,22 +492,52 @@ namespace ipushpull {
             }
         }
 
+        /**
+         * Setter for pull encryption key
+         * @param key
+         */
         public set encryptionKeyPull(key: IEncryptionKey){ this._encryptionKeyPull = key; }
+
+        /**
+         * Setter for push encryption key
+         * @param key
+         */
         public set encryptionKeyPush(key: IEncryptionKey){ this._encryptionKeyPush = key; }
 
+        /**
+         * Getter for page data
+         * @returns {IPage}
+         */
         public get data(): IPage{ return this._data; }
+
+        /**
+         * Getter for page access
+         * @returns {IUserPageAccess}
+         */
         public get access(): IUserPageAccess { return this._access; }
 
+        /**
+         * Start page updates
+         */
         public start(): void{
             this._provider.start();
             this.updatesOn = true;
         }
 
+        /**
+         * Stop page updates
+         */
         public stop(): void{
             this._provider.stop();
             this.updatesOn = false;
         }
 
+        /**
+         * Push new data to a page. This method accepts either full page content or delta content update
+         * @param data
+         * @param delta
+         * @returns {IPromise<any>}
+         */
         public push(data: IPageContent|IPageDelta, delta: boolean = true): IPromise<any> {
             if (delta){
                 return this.pushDelta(<IPageDelta>data);
@@ -445,6 +546,11 @@ namespace ipushpull {
             }
         }
 
+        /**
+         * Save page settings/meta
+         * @param data
+         * @returns {IPromise<any>}
+         */
         public saveMeta(data: any): IPromise<any>{
             let q: IDeferred<any> = $q.defer();
             // Remove access rights (if any)
@@ -462,6 +568,10 @@ namespace ipushpull {
             return q.promise;
         }
 
+        /**
+         * Check if page is encrypted and decrypt it if it is
+         * @param key
+         */
         // @todo This is NOT good
         public decrypt(key?: IEncryptionKey): void {
             // @todo Oh lord...
@@ -505,12 +615,22 @@ namespace ipushpull {
             }
         }
 
+        /**
+         * Destroy page object
+         */
         public destroy(): void {
             this._provider.destroy();
             $interval.cancel(this._accessInterval);
             this.removeEvent();
         }
 
+        /**
+         * Clone current page. Clones page content and some settings, can specify more options via options param
+         * @param folderId
+         * @param name
+         * @param options
+         * @returns {IPromise<IPageService>}
+         */
         public clone(folderId: number, name: string, options: IPageCloneOptions = {}): IPromise<IPageService> {
             let q: IDeferred<IPageService> = $q.defer();
 
@@ -540,6 +660,9 @@ namespace ipushpull {
             return q.promise;
         }
 
+        /**
+         * Actual bootstrap of the page, starts page updates, registeres provider, starts page access updates
+         */
         private init(): void{
             this.Ranges = new Ranges(this._folderId, this._pageId);
 
@@ -562,6 +685,12 @@ namespace ipushpull {
             this.registerListeners();
         }
 
+        /**
+         * In case page is requested with name, get page ID from service
+         * @param folderName
+         * @param pageName
+         * @returns {IPromise<any>}
+         */
         private getPageId(folderName: string, pageName: string): IPromise<any> {
             let q: IDeferred<any> = $q.defer();
 
@@ -577,6 +706,10 @@ namespace ipushpull {
             return q.promise;
         }
 
+        /**
+         * Load page access
+         * @returns {IPromise<any>}
+         */
         private getPageAccess(): IPromise<any>{
             let q: IDeferred<any> = $q.defer();
 
@@ -597,6 +730,9 @@ namespace ipushpull {
             return q.promise;
         }
 
+        /**
+         * Register listeners. THese are listeners on events emitted from page providers, which are processed and then re-emitted to public
+         */
         private registerListeners(): void{
             // Setup listeners
             this._provider.on("content_update", (data) => {
@@ -647,6 +783,11 @@ namespace ipushpull {
             });
         }
 
+        /**
+         * Push full content update
+         * @param content
+         * @returns {IPromise<any>}
+         */
         private pushFull(content: IPageContent): IPromise<any>{
             let q: IDeferred<any> = $q.defer();
 
@@ -698,6 +839,11 @@ namespace ipushpull {
             return q.promise;
         }
 
+        /**
+         * Push delta content update
+         * @param data
+         * @returns {IPromise<any>}
+         */
         private pushDelta(data: IPageDelta): IPromise<any>{
             let q: IDeferred<any> = $q.defer();
 
@@ -712,6 +858,9 @@ namespace ipushpull {
             return q.promise;
         }
 
+        /**
+         * Check if page is considered to be ready
+         */
         // @todo Not a great logic - When do we consider for a page to actually be ready?
         private checkReady(): void {
             if (this._contentLoaded && this._metaLoaded && !this.ready){
@@ -720,6 +869,11 @@ namespace ipushpull {
             }
         }
 
+        /**
+         * Temporary fix to update page types. This will take any page report types and adds 1000 to them. This way can do easier filtering.
+         * @param pageType
+         * @returns {number}
+         */
         private updatePageType(pageType: number): number{
             if (pageType > 0 && pageType < 5 || pageType === 7){
                 pageType += 1000;
@@ -728,6 +882,12 @@ namespace ipushpull {
             return pageType;
         }
 
+        /**
+         * Encrypt page content with given key
+         * @param key
+         * @param content
+         * @returns {string}
+         */
         private encrypt(key: IEncryptionKey, content: IPageContent): string {
             // @todo: Handle encryption error
             return crypto.encryptContent(key, content);
@@ -766,7 +926,12 @@ namespace ipushpull {
                 this._permissions = permissions;
             }
         }
-        
+
+        /**
+         * Set permission for a user
+         * @param userId
+         * @param permission
+         */
         public setPermission(userId: number, permission?: string): void {
             // First remove user rom all ranges
             if (this._permissions.ro.indexOf(userId) >= 0) {
@@ -782,6 +947,11 @@ namespace ipushpull {
             }
         }
 
+        /**
+         * Get permission for a user
+         * @param userId
+         * @returns {string}
+         */
         public getPermission(userId: number): string {
             let permission: string = "";
 
@@ -794,6 +964,10 @@ namespace ipushpull {
             return permission;
         }
 
+        /**
+         * Serialize range to final service-accepted object
+         * @returns {{name: string, start: string, end: string, rights: IPageRangeRights, freeze: boolean}}
+         */
         public toObject(): IPageRange {
             return {
                 name: this.name,
@@ -813,6 +987,10 @@ namespace ipushpull {
 
         constructor(public name: string, public subject: TFreezeSubject = "rows", public count: number = 1){}
 
+        /**
+         * Serialize range to final service-accepted object
+         * @returns {{name: string, start: string, end: string, rights: IPageRangeRights, freeze: boolean}}
+         */
         public toObject(): IPageRange {
             let range: IPageRange = {
                 name: this.name,
@@ -844,6 +1022,11 @@ namespace ipushpull {
     }
 
     class Ranges implements IPageRangesCollection {
+        /**
+         * List of ranges in collection
+         * @type {Array}
+         * @private
+         */
         private _ranges: IPageRangeItem[] = [];
 
         private _folderId: number;
@@ -852,6 +1035,10 @@ namespace ipushpull {
         public get TYPE_PERMISSION_RANGE(): string { return "permissions"; }
         public get TYPE_FREEZING_RANGE(): string { return "freezing"; }
 
+        /**
+         * Getter for list of ranges
+         * @returns {IPageRangeItem[]}
+         */
         public get ranges(): IPageRangeItem[] { return this._ranges; }
 
         constructor(folderId: number, pageId: number, pageAccessRights?: string){
@@ -863,12 +1050,22 @@ namespace ipushpull {
             }
         }
 
+        /**
+         * Rewrites current collection of ranges with given ranges
+         * @param ranges
+         * @returns {ipushpull.Ranges}
+         */
         public setRanges(ranges: IPageRangeItem[]): IPageRangesCollection {
             this._ranges = ranges;
 
             return this;
         }
 
+        /**
+         * Adds range to collection. Also prevents duplicate names
+         * @param range
+         * @returns {ipushpull.Ranges}
+         */
         public addRange(range: IPageRangeItem): IPageRangesCollection {
             // Prevent duplicates
             let nameUnique: boolean = false;
@@ -894,6 +1091,12 @@ namespace ipushpull {
             return this;
         }
 
+        /**
+         * Removes range from collection
+         *
+         * @param range
+         * @returns {ipushpull.Ranges}
+         */
         public removeRange(range: IPageRangeItem): IPageRangesCollection {
             if (this._ranges.indexOf(range) >= 0) {
                 this._ranges.splice(this._ranges.indexOf(range), 1);
@@ -902,6 +1105,11 @@ namespace ipushpull {
             return this;
         }
 
+        /**
+         * Save ranges to a page
+         * @returns {IPromise<IRequestResult>}
+         */
+        // @todo This is way out of scope
         public save(): IPromise<any> {
             let ranges: IPageRange[] = [];
 
@@ -921,6 +1129,11 @@ namespace ipushpull {
             return api.savePageSettings(requestData);
         }
 
+        /**
+         * Parse range data loaded from service into range collection
+         * @param pageAccessRights
+         * @returns {IPageRangeItem[]}
+         */
         public parse(pageAccessRights: string): IPageRangeItem[] {
             let ar: IPageRange[] = JSON.parse(pageAccessRights);
 
@@ -967,21 +1180,33 @@ namespace ipushpull {
             this.start();
         }
 
+        /**
+         * Start polling for page updates
+         */
         public start(): void {
             this._stopped = false;
             this.startPolling();
         }
 
+        /**
+         * Stop polling for page updates
+         */
         public stop(): void {
             this._stopped = true;
             $timeout.cancel(this._timer);
         }
 
+        /**
+         * Stop polling for page updates and stop all events
+         */
         public destroy(): void {
             this.stop();
             this.removeEvent();
         }
 
+        /**
+         * Start the actual polling (loop)
+         */
         // @todo Not great
         private startPolling(): void {
             this.load();
@@ -991,6 +1216,11 @@ namespace ipushpull {
             }, this._timeout);
         }
 
+        /**
+         * Load page data from service
+         * @param ignoreSeqNo
+         * @returns {IPromise<IPage>}
+         */
         private load(ignoreSeqNo: boolean = false): IPromise<IPage> {
             let q: IDeferred<IPage> = $q.defer();
 
@@ -1091,7 +1321,9 @@ namespace ipushpull {
             auth.on(auth.EVENT_LOGIN_REFRESHED, this.onAuthRefresh);
         }
 
-        // This is really just for content
+        /**
+         * Start listening for content updates. If socket not connected yet, it will initialize the socket connection
+         */
         public start(): void {
             if (!this._socket || !this._socket.connected){
                 this.init();
@@ -1100,7 +1332,10 @@ namespace ipushpull {
             }
         }
 
-        // @todo Disconnecting socket on stop might be too wasteful. Better just throw away updates? or is that wasteful?
+        /**
+         * Stop receiving page content updates (still keeps receiving settings/meta updates and other events)
+         * This will NOT disconnect the socket, merely it will just stop listening for updates - throws them away
+         */
         public stop(): void {
             // this._socket.disconnect();
             this._socket.off(ProviderSocket.SOCKET_EVENT_PAGE_CONTENT, this.onPageContent);
@@ -1108,6 +1343,9 @@ namespace ipushpull {
             this._stopped = true;
         }
 
+        /**
+         * Remove listeners for all socket events, disconnects socket and destroys object
+         */
         public destroy(): void {
             this._socket.removeAllListeners();
             this._socket.disconnect();
@@ -1116,6 +1354,9 @@ namespace ipushpull {
             this.removeEvent(); // @todo this means that listeners will be still registered even though none are gonna get triggered - memory leak?
         }
 
+        /**
+         * Initialize socket connection with all listeners
+         */
         private init(): void {
             // Connect to socket
             this._socket = this.connect();
@@ -1134,6 +1375,10 @@ namespace ipushpull {
             this._stopped = false;
         }
 
+        /**
+         * Connect socket to a server. If client doesnt support websockets, it tries to fall back to long polling
+         * @returns {SocketIOClient.Socket}
+         */
         private connect(): Socket {
             let query: string[] = [
                 `access_token=${storage.persistent.get("access_token")}`,
@@ -1150,26 +1395,44 @@ namespace ipushpull {
             });
         }
 
+        /**
+         * onConnect event action
+         */
         private onConnect: any = () => {
             return;
         };
 
+        /**
+         * onDisconnect event action
+         */
         private onDisconnect: any = () => {
             return;
         };
 
+        /**
+         * onPageContent eent action
+         * @param data
+         */
         private onPageContent = (data: IPageServiceContent): void => {
             $timeout(() => {
                 this.emit("content_update", data);
             });
         };
 
+        /**
+         * onPageSettings event action
+         * @param data
+         */
         private onPageSettings = (data: IPageServiceMeta): void => {
             $timeout(() => {
                 this.emit("meta_update", data);
             });
         };
 
+        /**
+         * onPageError event action
+         * @param data
+         */
         private onPageError = (data: any): void => {
             $timeout(() => {
                 if (data.code === 401){
@@ -1180,6 +1443,10 @@ namespace ipushpull {
             });
         };
 
+        /**
+         * onOAuthError event action
+         * @param data
+         */
         private onOAuthError = (data: any): void => {
             // @todo Do something
 
@@ -1188,11 +1455,18 @@ namespace ipushpull {
             // @todo Emit page error ?
         };
 
+        /**
+         * onAuthRefresh event action
+         */
         private onAuthRefresh = (): void => {
             let dummy: number = this._pageId; // This is here just to make the callback different, otherwise event emitter prevents duplicates
             this.start();
         };
 
+        /**
+         * Determines if client supports websockets
+         * @returns {boolean}
+         */
         private supportsWebSockets = () => { return "WebSocket" in window || "MozWebSocket" in window; };
     }
 
@@ -1202,7 +1476,16 @@ namespace ipushpull {
     }
 
     class PageStyles implements IPageStyler {
+        /**
+         * Holds current set of styles (inheritence)
+         * @type {{}}
+         */
         private currentStyle: IPageCellStyle = {};
+
+        /**
+         * Holds current set of borders (inheritence)
+         * @type {{top: {}; right: {}; bottom: {}; left: {}}}
+         */
         private currentBorders: any = {top: {}, right: {}, bottom: {}, left: {}};
 
         /**
@@ -1272,6 +1555,11 @@ namespace ipushpull {
             "number-format",
         ];
 
+        /**
+         * Take styles in inheritence form that is supplied by service and decompress them into cell-by-cell styles
+         * @param content
+         * @returns {IPageContent}
+         */
         public static decompressStyles(content: IPageContent): IPageContent {
             let styler: IPageStyler = new PageStyles();
 
@@ -1284,6 +1572,9 @@ namespace ipushpull {
             return content;
         }
 
+        /**
+         * Clear current values and start from zero
+         */
         public reset(): void{
             this.currentStyle = {};
             this.currentBorders = {top: {}, right: {}, bottom: {}, left: {}};
