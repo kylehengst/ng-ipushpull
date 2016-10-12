@@ -8362,7 +8362,6 @@ var ipushpull;
                     this.decrypted = true;
                     this._data.content = decrypted;
                     this._encryptionKeyPull = key;
-                    this.emit(this.EVENT_DECRYPTED);
                 }
                 else {
                     this.decrypted = false;
@@ -8374,6 +8373,7 @@ var ipushpull;
             }
             if (this.decrypted) {
                 this._data.content = PageStyles.decompressStyles(this._data.content);
+                this.emit(this.EVENT_DECRYPTED);
             }
         };
         Page.prototype.destroy = function () {
@@ -8476,6 +8476,7 @@ var ipushpull;
         Page.prototype.pushFull = function (content) {
             var _this = this;
             var q = $q.defer();
+            this._data.content = PageStyles.compressStyles(this._data.content);
             if (this._data.encryption_type_to_use) {
                 if (!this._encryptionKeyPush || this._data.encryption_key_to_use !== this._encryptionKeyPush.name) {
                     q.reject("None or wrong encryption key");
@@ -8522,6 +8523,12 @@ var ipushpull;
                 pageId: this._pageId,
                 data: data,
             };
+            var pageStyles = new PageStyles();
+            for (var i = 0; i < data.content_delta.length; i++) {
+                for (var j = 0; j < data.content_delta[i].cols.length; j++) {
+                    data.content_delta[i].cols[j].cell_content.style = pageStyles.reverseCellStyle(data.content_delta[i].cols[j].cell_content.style, false);
+                }
+            }
             api.savePageContentDelta(requestData).then(q.resolve, q.reject);
             return q.promise;
         };
@@ -8992,6 +8999,15 @@ var ipushpull;
             }
             return content;
         };
+        PageStyles.compressStyles = function (content) {
+            var styler = new PageStyles();
+            for (var i = 0; i < content.length; i++) {
+                for (var j = 0; j < content[i].length; j++) {
+                    content[i][j].style = styler.reverseCellStyle(content[i][j].style);
+                }
+            }
+            return styler.cleanUpReversed(content);
+        };
         PageStyles.prototype.reset = function () {
             this.currentStyle = {};
             this.currentBorders = { top: {}, right: {}, bottom: {}, left: {} };
@@ -8999,22 +9015,19 @@ var ipushpull;
         PageStyles.prototype.makeStyle = function (cellStyle) {
             var styleName, style = angular.copy(cellStyle);
             for (var item in style) {
+                if (!style.hasOwnProperty(item)) {
+                    continue;
+                }
                 if (this.ignoreStyles.indexOf(item) >= 0) {
                     continue;
                 }
                 styleName = this.excelToCSS(item);
                 var prefix = "", suffix = "";
-                if ((styleName === "color" || styleName === "background-color") && style[item] !== "none") {
+                if ((styleName === "color" || styleName === "background-color") && style[item] !== "none" && style[item].indexOf("#") < 0) {
                     prefix = "#";
-                }
-                if (styleName === "font-family") {
-                    suffix = ", Arial, Helvetica, sans-serif";
                 }
                 if (styleName === "white-space") {
                     style[item] = (style[item] === "normal") ? "pre" : "pre-wrap";
-                }
-                if (styleName === "width" || styleName === "height") {
-                    suffix = " !important";
                 }
                 if (styleName.indexOf("border") >= 0) {
                     var pos = styleName.split("-")[1];
@@ -9036,9 +9049,71 @@ var ipushpull;
                 if (typeof this.currentBorders[borderPos].style === "undefined" || !this.currentBorders[borderPos].style) {
                     continue;
                 }
-                resultStyles["border-" + borderPos] = this.currentBorders[borderPos].width + " " + this.currentBorders[borderPos].style + " " + this.currentBorders[borderPos].color + ";";
+                resultStyles["border-" + borderPos] = this.currentBorders[borderPos].width + " " + this.currentBorders[borderPos].style + " " + this.currentBorders[borderPos].color;
             }
             return resultStyles;
+        };
+        PageStyles.prototype.reverseCellStyle = function (cellStyle, fullStyles) {
+            if (fullStyles === void 0) { fullStyles = true; }
+            var genericStyle = {};
+            for (var style in cellStyle) {
+                if (!cellStyle.hasOwnProperty(style)) {
+                    continue;
+                }
+                if (style.indexOf("border") < 0) {
+                    if (style === "color" || style === "background-color") {
+                        cellStyle[style] = cellStyle[style].replace("#", "");
+                    }
+                    if (style === "font-family") {
+                        cellStyle[style] = cellStyle[style].split(",")[0];
+                    }
+                    genericStyle[this.CSSToExcel(style)] = cellStyle[style].trim();
+                }
+                else {
+                    var pos = style.split("-")[1].charAt(0);
+                    var parts = cellStyle[style].split(" ");
+                    genericStyle[pos + "bw"] = parts[0];
+                    genericStyle[pos + "bs"] = parts[1];
+                    genericStyle[pos + "bc"] = parts[2];
+                }
+            }
+            if (fullStyles) {
+                for (var eStyle in this.excelStyles) {
+                    if (!this.excelStyles.hasOwnProperty(eStyle)) {
+                        continue;
+                    }
+                    if (eStyle === "text-wrap") {
+                        continue;
+                    }
+                    if (!genericStyle[eStyle]) {
+                        genericStyle[eStyle] = "none";
+                    }
+                }
+            }
+            return genericStyle;
+        };
+        PageStyles.prototype.cleanUpReversed = function (content) {
+            var styleCurrent = {};
+            for (var i = 0; i < content.length; i++) {
+                for (var j = 0; j < content[i].length; j++) {
+                    var styleCopy = angular.copy(content[i][j].style);
+                    for (var styleName in styleCopy) {
+                        if (!styleCopy.hasOwnProperty(styleName)) {
+                            continue;
+                        }
+                        if (styleCurrent[styleName] && (styleCurrent[styleName] === styleCopy[styleName])) {
+                            delete content[i][j].style[styleName];
+                        }
+                        else {
+                            styleCurrent[styleName] = styleCopy[styleName];
+                        }
+                    }
+                    if (!Object.keys(content[i][j].style).length) {
+                        delete content[i][j].style;
+                    }
+                }
+            }
+            return content;
         };
         PageStyles.prototype.excelToCSS = function (val) {
             return (this.excelStyles[val]) ? this.excelStyles[val] : val;
@@ -9062,6 +9137,15 @@ var ipushpull;
                 }
             }
             return bWeight;
+        };
+        PageStyles.prototype.rgbToHex = function (rgb) {
+            rgb = rgb.replace("rgb(", "").replace(")", "");
+            var parts = rgb.split(",");
+            return this.componentToHex(parseInt(parts[0], 10)) + this.componentToHex(parseInt(parts[1], 10)) + this.componentToHex(parseInt(parts[2], 10));
+        };
+        PageStyles.prototype.componentToHex = function (c) {
+            var hex = c.toString(16);
+            return hex.length === 1 ? "0" + hex : hex;
         };
         return PageStyles;
     }());
