@@ -1193,6 +1193,8 @@ var ipushpull;
                 pageId: this._pageId,
             }).then(function (res) {
                 _this._access = res.data;
+                _this._accessLoaded = true;
+                _this.checkReady();
                 _this.emit(_this.EVENT_ACCESS_UPDATED);
                 q.resolve();
             }, function (err) {
@@ -1224,7 +1226,7 @@ var ipushpull;
             this._provider.on("error", function (err) {
                 err.code = err.httpCode || err.code;
                 err.message = err.httpText || err.message;
-                _this.emit(_this.EVENT_ERROR, err.message);
+                _this.emit(_this.EVENT_ERROR, err);
                 if (err.code === 404) {
                     _this.destroy();
                 }
@@ -1290,7 +1292,7 @@ var ipushpull;
             return q.promise;
         };
         Page.prototype.checkReady = function () {
-            if (this._contentLoaded && this._metaLoaded && !this.ready) {
+            if (this._contentLoaded && this._metaLoaded && this._accessLoaded && !this.ready) {
                 this.ready = true;
                 this.emit(this.EVENT_READY);
             }
@@ -1532,6 +1534,7 @@ var ipushpull;
                 if (res.httpCode === 200 || res.httpCode === 204) {
                     if (res.httpCode === 200) {
                         _this._seqNo = res.data.seq_no;
+                        _this._timeout = res.data.pull_interval * 1000;
                         _this.emit("content_update", _this.tempGetContentOb(res.data));
                         _this.emit("meta_update", _this.tempGetSettingsOb(res.data));
                     }
