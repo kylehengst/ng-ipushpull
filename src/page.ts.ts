@@ -387,6 +387,7 @@ namespace ipushpull {
         // Ouch... but what else can I do....
         private _contentLoaded: boolean;
         private _metaLoaded: boolean;
+        private _accessLoaded: boolean;
 
         private _encryptionKeyPull: IEncryptionKey = {
             name: "",
@@ -761,6 +762,10 @@ namespace ipushpull {
             }).then((res: any) => {
                 this._access = res.data;
 
+                this._accessLoaded = true;
+                this.checkReady(); // @todo ouch...
+
+                // @todo this should be only emitted when access actually changes
                 this.emit(this.EVENT_ACCESS_UPDATED);
                 q.resolve();
             }, (err) => {
@@ -817,7 +822,7 @@ namespace ipushpull {
                 err.code = err.httpCode || err.code;
                 err.message = err.httpText || err.message;
 
-                this.emit(this.EVENT_ERROR, err.message);
+                this.emit(this.EVENT_ERROR, err);
 
                 if (err.code === 404){
                     this.destroy();
@@ -921,7 +926,7 @@ namespace ipushpull {
          */
         // @todo Not a great logic - When do we consider for a page to actually be ready?
         private checkReady(): void {
-            if (this._contentLoaded && this._metaLoaded && !this.ready){
+            if (this._contentLoaded && this._metaLoaded && this._accessLoaded && !this.ready){
                 this.ready = true;
                 this.emit(this.EVENT_READY);
             }
@@ -1299,6 +1304,7 @@ namespace ipushpull {
                     // New update
                     if (res.httpCode === 200){
                         this._seqNo = res.data.seq_no;
+                        this._timeout = res.data.pull_interval * 1000;
                         this.emit("content_update", this.tempGetContentOb(res.data));
                         this.emit("meta_update", this.tempGetSettingsOb(res.data));
                     } else {
