@@ -7251,18 +7251,27 @@ module.exports = yeast;
 var ipushpull;
 (function (ipushpull) {
     "use strict";
-    ipushpull.module = angular.module("ipushpull", []);
-    ipushpull.module.factory("ippConfig", ["ipushpull_conf", function (cfg) {
+    var ConfigProvider = (function () {
+        function ConfigProvider() {
+        }
+        ConfigProvider.prototype.set = function (config) {
             var defaults = {
                 api_url: "https://www.ipushpull.com/api/1.0",
                 ws_url: "https://www.ipushpull.com",
             };
-            if (cfg.api_url && !cfg.ws_url) {
-                var parts = cfg.api_url.split("/");
+            if (config.api_url && !config.ws_url) {
+                var parts = config.api_url.split("/");
                 defaults.ws_url = parts[0] + "//" + parts[2];
             }
-            return angular.merge({}, defaults, cfg);
-        }]);
+            this._config = angular.merge({}, defaults, config);
+        };
+        ConfigProvider.prototype.$get = function () {
+            return this._config;
+        };
+        return ConfigProvider;
+    }());
+    ipushpull.module = angular.module("ipushpull", [])
+        .provider("ippConfig", ConfigProvider);
 })(ipushpull || (ipushpull = {}));
 
 var ipushpull;
@@ -7902,194 +7911,6 @@ var ipushpull;
         return Crypto;
     }());
     ipushpull.module.factory("ippCryptoService", Crypto._instance);
-})(ipushpull || (ipushpull = {}));
-
-var ipushpull;
-(function (ipushpull) {
-    "use strict";
-})(ipushpull || (ipushpull = {}));
-var ipushpull;
-(function (ipushpull) {
-    "use strict";
-    var PermissionRange = (function () {
-        function PermissionRange(name, rowStart, rowEnd, colStart, colEnd, permissions) {
-            if (rowStart === void 0) { rowStart = 0; }
-            if (rowEnd === void 0) { rowEnd = 0; }
-            if (colStart === void 0) { colStart = 0; }
-            if (colEnd === void 0) { colEnd = 0; }
-            this.name = name;
-            this.rowStart = rowStart;
-            this.rowEnd = rowEnd;
-            this.colStart = colStart;
-            this.colEnd = colEnd;
-            this._permissions = {
-                ro: [],
-                no: [],
-            };
-            if (permissions) {
-                this._permissions = permissions;
-            }
-        }
-        PermissionRange.prototype.setPermission = function (userId, permission) {
-            if (this._permissions.ro.indexOf(userId) >= 0) {
-                this._permissions.ro.splice(this._permissions.ro.indexOf(userId), 1);
-            }
-            if (this._permissions.no.indexOf(userId) >= 0) {
-                this._permissions.no.splice(this._permissions.no.indexOf(userId), 1);
-            }
-            if (permission) {
-                this._permissions[permission].push(userId);
-            }
-        };
-        PermissionRange.prototype.getPermission = function (userId) {
-            var permission = "";
-            if (this._permissions.ro.indexOf(userId) >= 0) {
-                permission = "ro";
-            }
-            else if (this._permissions.no.indexOf(userId) >= 0) {
-                permission = "no";
-            }
-            return permission;
-        };
-        PermissionRange.prototype.toObject = function () {
-            return {
-                name: this.name,
-                start: this.rowStart + ":" + this.colStart,
-                end: this.rowEnd + ":" + this.colEnd,
-                rights: this._permissions,
-                freeze: false,
-            };
-        };
-        return PermissionRange;
-    }());
-    ipushpull.PermissionRange = PermissionRange;
-    var FreezingRange = (function () {
-        function FreezingRange(name, subject, count) {
-            if (subject === void 0) { subject = "rows"; }
-            if (count === void 0) { count = 1; }
-            this.name = name;
-            this.subject = subject;
-            this.count = count;
-        }
-        Object.defineProperty(FreezingRange, "SUBJECT_ROWS", {
-            get: function () { return "rows"; },
-            enumerable: true,
-            configurable: true
-        });
-        ;
-        Object.defineProperty(FreezingRange, "SUBJECT_COLUMNS", {
-            get: function () { return "cols"; },
-            enumerable: true,
-            configurable: true
-        });
-        ;
-        FreezingRange.prototype.toObject = function () {
-            var range = {
-                name: this.name,
-                start: "0:0",
-                end: "",
-                rights: { ro: [], no: [] },
-                freeze: true,
-            };
-            if (this.subject === FreezingRange.SUBJECT_ROWS) {
-                range.end = (this.count - 1) + ":-1";
-            }
-            else {
-                range.end = "-1:" + (this.count - 1);
-            }
-            return range;
-        };
-        return FreezingRange;
-    }());
-    ipushpull.FreezingRange = FreezingRange;
-    var Ranges = (function () {
-        function Ranges(folderId, pageId, pageAccessRights) {
-            this._ranges = [];
-            this._folderId = folderId;
-            this._pageId = pageId;
-            if (pageAccessRights) {
-                this.parse(pageAccessRights);
-            }
-        }
-        Object.defineProperty(Ranges.prototype, "TYPE_PERMISSION_RANGE", {
-            get: function () { return "permissions"; },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Ranges.prototype, "TYPE_FREEZING_RANGE", {
-            get: function () { return "freezing"; },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Ranges.prototype, "ranges", {
-            get: function () { return this._ranges; },
-            enumerable: true,
-            configurable: true
-        });
-        Ranges.prototype.setRanges = function (ranges) {
-            this._ranges = ranges;
-            return this;
-        };
-        Ranges.prototype.addRange = function (range) {
-            var nameUnique = false;
-            var newName = range.name;
-            var count = 1;
-            while (!nameUnique) {
-                nameUnique = true;
-                for (var i = 0; i < this._ranges.length; i++) {
-                    if (this._ranges[i].name === newName) {
-                        nameUnique = false;
-                        newName = range.name + "_" + count;
-                        count++;
-                    }
-                }
-            }
-            range.name = newName;
-            this._ranges.push(range);
-            return this;
-        };
-        Ranges.prototype.removeRange = function (range) {
-            if (this._ranges.indexOf(range) >= 0) {
-                this._ranges.splice(this._ranges.indexOf(range), 1);
-            }
-            return this;
-        };
-        Ranges.prototype.save = function () {
-            var ranges = [];
-            for (var i = 0; i < this._ranges.length; i++) {
-                ranges.push(this._ranges[i].toObject());
-            }
-            var requestData = {
-                domainId: this._folderId,
-                pageId: this._pageId,
-                data: {
-                    access_rights: JSON.stringify(ranges),
-                },
-            };
-            return api.savePageSettings(requestData);
-        };
-        Ranges.prototype.parse = function (pageAccessRights) {
-            var ar = JSON.parse(pageAccessRights);
-            this._ranges = [];
-            for (var i = 0; i < ar.length; i++) {
-                var rowStart = parseInt(ar[i].start.split(":")[0], 10);
-                var rowEnd = parseInt(ar[i].end.split(":")[0], 10);
-                var colStart = parseInt(ar[i].start.split(":")[1], 10);
-                var colEnd = parseInt(ar[i].end.split(":")[1], 10);
-                if (ar[i].freeze) {
-                    var subject = (colEnd >= 0) ? "cols" : "rows";
-                    var count = (colEnd >= 0) ? colEnd + 1 : rowEnd + 1;
-                    this._ranges.push(new FreezingRange(ar[i].name, subject, count));
-                }
-                else {
-                    this._ranges.push(new PermissionRange(ar[i].name, rowStart, rowEnd, colStart, colEnd, ar[i].rights));
-                }
-            }
-            return this._ranges;
-        };
-        return Ranges;
-    }());
-    ipushpull.Ranges = Ranges;
 })(ipushpull || (ipushpull = {}));
 
 var __extends = (this && this.__extends) || function (d, b) {
@@ -9268,9 +9089,7 @@ var ipushpull;
         return CookieStorage;
     }());
     var StorageService = (function () {
-        function StorageService() {
-        }
-        StorageService.bootstrap = function (ippConfig) {
+        function StorageService(ippConfig) {
             var userStorage = new LocalStorage();
             userStorage.suffix = "GUEST";
             var globalStorage = new LocalStorage();
@@ -9285,11 +9104,11 @@ var ipushpull;
                 global: globalStorage,
                 persistent: persistentStorage,
             };
-        };
+        }
         StorageService.$inject = ["ippConfig"];
         return StorageService;
     }());
-    ipushpull.module.factory("ippStorageService", StorageService.bootstrap);
+    ipushpull.module.factory("ippStorageService", StorageService);
 })(ipushpull || (ipushpull = {}));
 
 var ipushpull;
