@@ -27,11 +27,13 @@ angular.module("myApp", ["ipushpull.page"]);
 ```
 // Configure ipushpull
 var myApp = angular.module("myApp", ["ipushpull.page"])
-    .constant("ipushpull_conf", {
-        api_key: "ipushpull api key",
-        api_secret: "ipushpull_api_secret",
-        api_url: "https://www.ipushpull.com" // (optional defaults to production)        
-    });
+    .config(["ippConfigProvier", function(ippConfigProvider){
+        ippConfigProvider.set({
+            api_key: "ipushpull api key",
+            api_secret: "ipushpull_api_secret",
+            api_url: "https://www.ipushpull.com" // (optional defaults to production)        
+        });
+    }]);
     
 // Create page object in your controller/service
 myApp.controller("ExampleCtrl", ["ipushpullPage", function(IppPage){

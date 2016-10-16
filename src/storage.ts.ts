@@ -276,7 +276,7 @@ namespace ipushpull {
     class StorageService {
         public static $inject: string[] = ["ippConfig"];
 
-        public static bootstrap(ippConfig: IIPPConfig): IStorageService{
+        public constructor(ippConfig: IIPPConfig){
             // User Storage
             let userStorage: IStorageProvider = new LocalStorage();
             userStorage.suffix = "GUEST";
@@ -303,5 +303,5 @@ namespace ipushpull {
     }
 
     // @Todo This is NOT ideal (user should not be aware of persistent or not persistent - should be automatic)
-    ipushpull.module.factory("ippStorageService", StorageService.bootstrap);
+    ipushpull.module.factory("ippStorageService", StorageService);
 }
