@@ -586,7 +586,7 @@ var ipushpull;
         };
         Auth.prototype.saveTokens = function (tokens) {
             this.storage.persistent.create("access_token", tokens.access_token, (tokens.expires_in / 86400));
-            this.storage.persistent.create("refresh_token", tokens.refresh_token);
+            this.storage.persistent.create("refresh_token", tokens.refresh_token, 365);
         };
         Auth.prototype.getUserInfo = function () {
             var _this = this;
