@@ -1076,10 +1076,10 @@ namespace ipushpull {
     export interface IPageRangesCollection {
         TYPE_PERMISSION_RANGE: string;
         TYPE_FREEZING_RANGE: string;
-        ranges: IPageRangeItem[];
+        ranges: (IPagePermissionRange|IPageFreezingRange)[];
         setRanges: (ranges: IPageRangeItem[]) => IPageRangesCollection;
         addRange: (range: IPageRangeItem) => IPageRangesCollection;
-        removeRange: (range: IPageRangeItem) => IPageRangesCollection;
+        removeRange: (rangeName: string) => IPageRangesCollection;
         save: () => IPromise<any>;
         parse: (pageAccessRights: string) => IPageRangeItem[];
     }
@@ -1090,7 +1090,7 @@ namespace ipushpull {
          * @type {Array}
          * @private
          */
-        private _ranges: IPageRangeItem[] = [];
+        private _ranges: (IPagePermissionRange|IPageFreezingRange)[] = [];
 
         private _folderId: number;
         private _pageId: number;
@@ -1102,7 +1102,7 @@ namespace ipushpull {
          * Getter for list of ranges
          * @returns {IPageRangeItem[]}
          */
-        public get ranges(): IPageRangeItem[] { return this._ranges; }
+        public get ranges(): (IPagePermissionRange|IPageFreezingRange)[] { return this._ranges; }
 
         constructor(folderId: number, pageId: number, pageAccessRights?: string){
             this._folderId = folderId;
@@ -1118,7 +1118,7 @@ namespace ipushpull {
          * @param ranges
          * @returns {ipushpull.Ranges}
          */
-        public setRanges(ranges: IPageRangeItem[]): IPageRangesCollection {
+        public setRanges(ranges: (IPagePermissionRange|IPageFreezingRange)[]): IPageRangesCollection {
             this._ranges = ranges;
 
             return this;
@@ -1129,7 +1129,17 @@ namespace ipushpull {
          * @param range
          * @returns {ipushpull.Ranges}
          */
-        public addRange(range: IPageRangeItem): IPageRangesCollection {
+        public addRange(range: IPagePermissionRange|IPageFreezingRange): IPageRangesCollection {
+            // Only one range per freezing subject allowed
+            if (range instanceof FreezingRange){
+                for (let i: number = 0; i < this._ranges.length; i++){
+                    if (this._ranges[i].subject === range.subject){
+                        this.removeRange(this._ranges[i].name);
+                        break;
+                    }
+                }
+            }
+
             // Prevent duplicates
             let nameUnique: boolean = false;
             let newName: string = range.name;
@@ -1157,12 +1167,21 @@ namespace ipushpull {
         /**
          * Removes range from collection
          *
-         * @param range
+         * @param rangeName
          * @returns {ipushpull.Ranges}
          */
-        public removeRange(range: IPageRangeItem): IPageRangesCollection {
-            if (this._ranges.indexOf(range) >= 0) {
-                this._ranges.splice(this._ranges.indexOf(range), 1);
+        public removeRange(rangeName: string): IPageRangesCollection {
+            let index: number = -1;
+
+            for (let i: number = 0; i < this._ranges.length; i++){
+                if (this._ranges[i].name === rangeName){
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index >= 0) {
+                this._ranges.splice(index, 1);
             }
 
             return this;

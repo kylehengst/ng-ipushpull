@@ -266,10 +266,10 @@ declare namespace ipushpull {
     interface IPageRangesCollection {
         TYPE_PERMISSION_RANGE: string;
         TYPE_FREEZING_RANGE: string;
-        ranges: IPageRangeItem[];
+        ranges: (IPagePermissionRange | IPageFreezingRange)[];
         setRanges: (ranges: IPageRangeItem[]) => IPageRangesCollection;
         addRange: (range: IPageRangeItem) => IPageRangesCollection;
-        removeRange: (range: IPageRangeItem) => IPageRangesCollection;
+        removeRange: (rangeName: string) => IPageRangesCollection;
         save: () => IPromise<any>;
         parse: (pageAccessRights: string) => IPageRangeItem[];
     }
