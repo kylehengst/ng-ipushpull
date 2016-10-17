@@ -192,7 +192,7 @@ namespace ipushpull {
 
         constructor(){
             // @todo There is pretty much no way to generalize this.... - Really?
-            this._domain = document.domain.replace(/(www)|(test)|(stable)/, "");
+            this._domain = document.domain.replace(/(www)|(test)|(stable)|(beta)/, "");
         }
 
         public create(key: string, value: string, expireDays?: number): void {
