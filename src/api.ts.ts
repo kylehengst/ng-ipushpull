@@ -112,7 +112,6 @@ namespace ipushpull {
     }
 
     export interface IApiService {
-        parseError: (err: any, def: string) => string;
         block: () => void;
         unblock: () => void;
         getSelfInfo: () => IPromise<IRequestResult>;

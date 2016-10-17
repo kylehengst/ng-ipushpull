@@ -201,7 +201,7 @@ namespace ipushpull {
             if (expireDays) {
                 let date: Date = new Date();
                 date.setTime(date.getTime() + (expireDays * 24 * 60 * 60 * 1000));
-                expires = "; expires=" + date.toGMTString();
+                expires = "; expires=" + date.toUTCString();
             }
 
             document.cookie = `${this.makeKey(key)}=${value}${expires}; path=/; domain=${this._domain}${(this.isSecure() ? ";secure;" : "")}`;
