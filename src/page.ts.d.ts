@@ -11,45 +11,6 @@ declare namespace ipushpull {
         pdf: number;
         liveUsage: number;
     }
-    interface IPageContentLink {
-        external: boolean;
-        address: string;
-    }
-    interface IPageCellStyle {
-        "background-color"?: string;
-        "color"?: string;
-        "font-family"?: string;
-        "font-size"?: string;
-        "font-style"?: string;
-        "font-weight"?: string;
-        "height"?: string;
-        "number-format"?: string;
-        "text-align"?: string;
-        "text-wrap"?: string;
-        "width"?: string;
-        "tbs"?: string;
-        "rbs"?: string;
-        "bbs"?: string;
-        "lbs"?: string;
-        "tbc"?: string;
-        "rbc"?: string;
-        "bbc"?: string;
-        "lbc"?: string;
-        "tbw"?: string;
-        "rbw"?: string;
-        "bbw"?: string;
-        "lbw"?: string;
-    }
-    interface IPageContentCell {
-        value: string;
-        formatted_value: string;
-        link?: IPageContentLink;
-        style?: IPageCellStyle;
-    }
-    interface IPageContent {
-        length: number;
-        [index: number]: IPageContentCell[];
-    }
     interface IPageServiceContent {
         id: number;
         seq_no: number;
@@ -98,19 +59,6 @@ declare namespace ipushpull {
         seq_no: number;
         show_gridlines: boolean;
         special_page_type: number;
-    }
-    interface IPageDeltaContentCol {
-        col_index: number;
-        cell_content: IPageContentCell;
-    }
-    interface IPageDeltaContentRow {
-        row_index: number;
-        cols: IPageDeltaContentCol[];
-    }
-    interface IPageDelta {
-        new_rows: number[];
-        new_cols: number[];
-        content_delta: IPageDeltaContentRow[];
     }
     interface IPage extends IPageServiceMeta {
     }
@@ -213,10 +161,11 @@ declare namespace ipushpull {
         encryptionKeyPush: IEncryptionKey;
         data: IPage;
         access: IUserPageAccess;
-        Ranges: any;
+        Content: IPageContentProvider;
+        Ranges: IPageRangesCollection;
         start: () => void;
         stop: () => void;
-        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
+        push: (forceFull?: boolean) => IPromise<any>;
         saveMeta: (data: any) => IPromise<any>;
         destroy: () => void;
         decrypt: (key: IEncryptionKey) => void;

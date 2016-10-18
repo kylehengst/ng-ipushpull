@@ -22,49 +22,6 @@ namespace ipushpull {
         liveUsage: number;
     }
 
-    export interface IPageContentLink {
-        external: boolean;
-        address: string;
-    }
-
-    export interface IPageCellStyle {
-        "background-color"?: string;
-        "color"?: string;
-        "font-family"?: string;
-        "font-size"?: string;
-        "font-style"?: string;
-        "font-weight"?: string;
-        "height"?: string;
-        "number-format"?: string;
-        "text-align"?: string;
-        "text-wrap"?: string;
-        "width"?: string;
-        "tbs"?: string;
-        "rbs"?: string;
-        "bbs"?: string;
-        "lbs"?: string;
-        "tbc"?: string;
-        "rbc"?: string;
-        "bbc"?: string;
-        "lbc"?: string;
-        "tbw"?: string;
-        "rbw"?: string;
-        "bbw"?: string;
-        "lbw"?: string;
-    }
-
-    export interface IPageContentCell {
-        value: string;
-        formatted_value: string;
-        link?: IPageContentLink;
-        style?: IPageCellStyle;
-    }
-
-    export interface IPageContent {
-        length: number; // Hack
-        [index: number]: IPageContentCell[];
-    }
-
     export interface IPageServiceContent {
         id: number;
         seq_no: number;
@@ -114,22 +71,6 @@ namespace ipushpull {
         seq_no: number;
         show_gridlines: boolean;
         special_page_type: number;
-    }
-
-    export interface IPageDeltaContentCol {
-        col_index: number;
-        cell_content: IPageContentCell;
-    }
-
-    export interface IPageDeltaContentRow {
-        row_index: number;
-        cols: IPageDeltaContentCol[];
-    }
-
-    export interface IPageDelta {
-        new_rows: number[];
-        new_cols: number[];
-        content_delta: IPageDeltaContentRow[];
     }
 
     export interface IPage extends IPageServiceMeta {
@@ -248,11 +189,12 @@ namespace ipushpull {
 
         data: IPage;
         access: IUserPageAccess;
-        Ranges;
+        Content: IPageContentProvider;
+        Ranges: IPageRangesCollection;
 
         start: () => void;
         stop: () => void;
-        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
+        push: (forceFull?: boolean) => IPromise<any>;
         saveMeta: (data: any) => IPromise<any>;
         destroy: () => void;
         decrypt: (key: IEncryptionKey) => void;
@@ -347,6 +289,12 @@ namespace ipushpull {
          * @type {IPageRangesCollection}
          */
         public Ranges: IPageRangesCollection;
+
+        /**
+         * Page content provider class
+         * @type {IPageContentProvider}
+         */
+        public Content: IPageContentProvider;
 
         /**
          * Indicates if client supports websockets
@@ -535,16 +483,25 @@ namespace ipushpull {
 
         /**
          * Push new data to a page. This method accepts either full page content or delta content update
-         * @param data
-         * @param delta
+         * @param forceFull
          * @returns {IPromise<any>}
          */
-        public push(data: IPageContent|IPageDelta, delta: boolean = true): IPromise<any> {
-            if (delta){
-                return this.pushDelta(<IPageDelta>data);
+        public push(forceFull: boolean = false): IPromise<any> {
+            let q: IDeferred<any> = $q.defer();
+
+            let onSuccess: any = (data) => {
+                this.Content.cleanDirty();
+                this._data.seq_no++;
+                q.resolve(data);
+            };
+
+            if (!this._data.encryption_type_to_use && this.Content.canDoDelta && !forceFull){
+                this.pushDelta(<IPageDelta>this.Content.getDelta()).then(onSuccess, q.reject);
             } else {
-                return this.pushFull(<IPageContent>data);
+                this.pushFull(<IPageContent>this.Content.getFull()).then(onSuccess, q.reject);
             }
+
+            return q.promise;
         }
 
         /**
@@ -649,9 +606,12 @@ namespace ipushpull {
             }
 
             // @todo ouch... should not be here
-            // @todo This is not good because it could run style decompressing on already decompressed styles and then styles break
             if (this.decrypted){
-                this._data.content = PageStyles.decompressStyles(this._data.content);
+                if (this.Content){
+                    this.Content.update(this._data.content);
+                } else {
+                    this.Content = new PageContent(this._data.content);
+                }
 
                 // @todo Emitting Decrypted and New content events will lead to confusion. Eventually you will want to subscribe to both for rendering, so you will have double rendering
                 this.emit(this.EVENT_DECRYPTED);
@@ -690,9 +650,12 @@ namespace ipushpull {
 
             // Create new page
             Page.create(folderId, name, this._data.special_page_type).then((newPage: IPageService) => {
+                newPage.Content = new PageContent(this._data.content);
+
                 $q.all([
-                    // @todo Save settings
-                    newPage.push(this._data.content, false), // Push content
+                    // @todo Page Settings
+                    // Push content
+                    newPage.push(true),
                 ]).then((res) => {
                     q.resolve(newPage);
                 }, q.reject); // @todo Handle properly
@@ -785,11 +748,7 @@ namespace ipushpull {
             this._provider.on("content_update", (data) => {
                 data.special_page_type = this.updatePageType(data.special_page_type);
 
-                this._data = angular.merge({}, this._data, data);
-
-                // We need to force override of content otherwise styles were being merged
-                // @todo This is temporary solution, something better will be introduced later on
-                this._data.content = data.content;
+                this._data = angular.extend({}, this._data, data);
 
                 this.decrypt();
 
@@ -807,7 +766,7 @@ namespace ipushpull {
                 delete data.content;
                 delete data.encrypted_content;
 
-                this._data = angular.merge({}, this._data, data);
+                this._data = angular.extend({}, this._data, data);
 
                 // Process ranges
                 this.Ranges.parse(data.access_rights || "[]");
@@ -837,9 +796,6 @@ namespace ipushpull {
          */
         private pushFull(content: IPageContent): IPromise<any>{
             let q: IDeferred<any> = $q.defer();
-
-            // Compress styles
-            this._data.content = PageStyles.compressStyles(this._data.content);
 
             // If encrypted
             if (this._data.encryption_type_to_use) {
@@ -900,21 +856,13 @@ namespace ipushpull {
         private pushDelta(data: IPageDelta): IPromise<any>{
             let q: IDeferred<any> = $q.defer();
 
+            // @todo Handle empty data/delta
+
             let requestData: any = {
                 domainId: this._folderId,
                 pageId: this._pageId,
                 data: data,
             };
-
-            // Styles
-            // @todo ouch...
-            let pageStyles: IPageStyler = new PageStyles();
-
-            for (let i: number = 0; i < data.content_delta.length; i++){
-                for (let j: number = 0; j < data.content_delta[i].cols.length; j++){
-                    data.content_delta[i].cols[j].cell_content.style = pageStyles.reverseCellStyle(data.content_delta[i].cols[j].cell_content.style, false);
-                }
-            }
 
             api.savePageContentDelta(requestData).then(q.resolve, q.reject);
 
@@ -1551,351 +1499,5 @@ namespace ipushpull {
          * @returns {boolean}
          */
         private supportsWebSockets = () => { return "WebSocket" in window || "MozWebSocket" in window; };
-    }
-
-    interface IPageStyler {
-        makeStyle: (cellStyle: IPageCellStyle) => IPageCellStyle;
-        reset: () => void;
-        reverseCellStyle: (cellStyle: IPageCellStyle, fullStyles?: boolean) => IPageCellStyle;
-        cleanUpReversed: (content: IPageContent) => IPageContent;
-    }
-
-    class PageStyles implements IPageStyler {
-        /**
-         * Holds current set of styles (inheritence)
-         * @type {{}}
-         */
-        private currentStyle: IPageCellStyle = {};
-
-        /**
-         * Holds current set of borders (inheritence)
-         * @type {{top: {}; right: {}; bottom: {}; left: {}}}
-         */
-        private currentBorders: any = {top: {}, right: {}, bottom: {}, left: {}};
-
-        /**
-         * Linking names of excel/json styles to css styles
-         * @type {{text-wrap: string, tbs: string, rbs: string, bbs: string, lbs: string, tbc: string, rbc: string, bbc: string, lbc: string, tbw: string, rbw: string, bbw: string, lbw: string}}
-         */
-        private excelStyles: any = {
-            "text-wrap": "white-space",
-            "tbs": "border-top-style",
-            "rbs": "border-right-style",
-            "bbs": "border-bottom-style",
-            "lbs": "border-left-style",
-            "tbc": "border-top-color",
-            "rbc": "border-right-color",
-            "bbc": "border-bottom-color",
-            "lbc": "border-left-color",
-            "tbw": "border-top-width",
-            "rbw": "border-right-width",
-            "bbw": "border-bottom-width",
-            "lbw": "border-left-width",
-        };
-
-        /**
-         * Map excel border styles to css border styles (with some compromise)
-         * @type {{solid: string, thin: string, thick: string, hair: string, dash: string, dashed: string, dashdot: string, mediumdashed: string, mediumdashdot: string, slantdashdot: string, dot: string, dotted: string, hairline: string, mediumdashdotdot: string, dashdotdot: string, double: string}}
-         */
-        private excelBorderStyles: any = {
-            "solid": "solid",
-            "thin": "solid",
-            "thick": "solid",
-            "hair": "solid",
-
-            "dash": "dashed",
-            "dashed": "dashed",
-            "dashdot": "dashed",
-            "mediumdashed": "dashed",
-            "mediumdashdot": "dashed",
-            "slantdashdot": "dashed",
-
-            "dot": "dotted",
-            "dotted": "dotted",
-            "hairline": "dotted", // Hairline is weight not style in excel (Whaaaat??),
-            "mediumdashdotdot": "dotted",
-            "dashdotdot": "dotted",
-
-            "double": "double",
-        };
-
-        /**
-         * Map excel border weights to css border weights (with some compromise)
-         * @type {{thin: string, medium: string, thick: string, hair: string, hairline: string, double: string}}
-         */
-        private excelBorderWeights: any = {
-            "thin": "1px",
-            "medium": "1px",
-            "thick": "2px",
-            "hair": "1px",
-            "hairline": "1px",
-            "double": "3px",
-        };
-
-        /**
-         * Styles to be ignored when rendering styles from excel/json - these styles cannot be represented in css
-         * @type {string[]}
-         */
-        private ignoreStyles: string[] = [
-            "number-format",
-        ];
-
-        /**
-         * Take styles in inheritence form that is supplied by service and decompress them into cell-by-cell styles
-         * @param content
-         * @returns {IPageContent}
-         */
-        public static decompressStyles(content: IPageContent): IPageContent {
-            let styler: IPageStyler = new PageStyles();
-
-            for (let i: number = 0; i < content.length; i++){
-                for (let j: number = 0; j < content[i].length; j++) {
-                    content[i][j].style = styler.makeStyle(content[i][j].style);
-                }
-            }
-
-            return content;
-        }
-
-        public static compressStyles(content: IPageContent): IPageContent {
-            let styler: IPageStyler = new PageStyles();
-
-            // Reverse styles from CSS-like to General
-            for (let i: number = 0; i < content.length; i++) {
-                for (let j: number = 0; j < content[i].length; j++) {
-                    content[i][j].style = styler.reverseCellStyle(content[i][j].style);
-                }
-            }
-
-            // Clean up reversed styles - apply inheritance
-            return styler.cleanUpReversed(content);
-        }
-
-        /**
-         * Clear current values and start from zero
-         */
-        public reset(): void{
-            this.currentStyle = {};
-            this.currentBorders = {top: {}, right: {}, bottom: {}, left: {}};
-        }
-
-        /**
-         * Parses cell styles from provided style rules.
-         *
-         * @param styleOrig
-         * @returns {string}
-         */
-        public makeStyle(cellStyle: IPageCellStyle): IPageCellStyle {
-            let styleName: string,
-                style: IPageCellStyle = angular.copy(cellStyle);
-
-            for (let item in style) {
-                if (!style.hasOwnProperty(item)){
-                    continue;
-                }
-
-                if (this.ignoreStyles.indexOf(item) >= 0) {
-                    continue;
-                }
-
-                styleName = this.excelToCSS(item);
-
-                let prefix: string = "",
-                    suffix: string = "";
-
-                if ((styleName === "color" || styleName === "background-color") && style[item] !== "none" && style[item].indexOf("#") < 0) {
-                    prefix = "#";
-                }
-
-                if (styleName === "white-space") {
-                    style[item] = (style[item] === "normal") ? "pre" : "pre-wrap";
-                }
-
-                if (styleName.indexOf("border") >= 0) {
-                    let pos: string = styleName.split("-")[1];
-
-                    if (styleName.indexOf("-style") >= 0) {
-                        this.currentBorders[pos].style = this.excelBorderStyles[style[item]] || undefined;
-                    }
-
-                    if (styleName.indexOf("-width") >= 0) {
-                        this.currentBorders[pos].width = (style[item] !== "none") ? this.excelBorderWeights[style[item]] : undefined; // use current value if not in array (if supplied number of px)
-                    }
-
-                    if (styleName.indexOf("-color") >= 0) {
-                        this.currentBorders[pos].color = (style[item] === "none") ? "transparent" : "#" + style[item];
-                    }
-
-                    continue;
-                }
-
-                this.currentStyle[styleName] = prefix + style[item] + suffix;
-            }
-
-            let resultStyles: IPageCellStyle = angular.copy(this.currentStyle);
-
-            // Process currentBorders
-            for (let borderPos in this.currentBorders) {
-                if (typeof this.currentBorders[borderPos].style === "undefined" || !this.currentBorders[borderPos].style){
-                    continue;
-                }
-
-                resultStyles["border-" + borderPos] = `${this.currentBorders[borderPos].width} ${this.currentBorders[borderPos].style} ${this.currentBorders[borderPos].color}`;
-            }
-
-
-            return resultStyles;
-        }
-
-        public reverseCellStyle(cellStyle: IPageCellStyle, fullStyles: boolean = true): IPageCellStyle {
-            let genericStyle: IPageCellStyle = {};
-
-            // First convert all styles into generic format
-            for (let style in cellStyle){
-                if (!cellStyle.hasOwnProperty(style)){
-                    continue;
-                }
-
-                if (style.indexOf("border") < 0){
-                    if (style === "color" || style === "background-color"){
-                        cellStyle[style] = cellStyle[style].replace("#", "");
-                    }
-
-                    // @todo text-wrap
-
-                    // Force only one font name - better to do this here than on client
-                    if (style === "font-family"){
-                        cellStyle[style] = cellStyle[style].split(",")[0];
-                    }
-
-                    genericStyle[this.CSSToExcel(style)] = cellStyle[style].trim();
-                } else {
-                    let pos: string = style.split("-")[1].charAt(0);
-                    let parts: string[] = cellStyle[style].split(" ");
-
-                    genericStyle[pos + "bw"] = parts[0];
-                    genericStyle[pos + "bs"] = parts[1];
-                    genericStyle[pos + "bc"] = parts[2];
-                }
-            }
-
-            if (fullStyles) {
-                /**
-                 * Here we are setting default value for borders, because if there are no borders then they simply dont show up in css text.
-                 * If they dont show up in css text when scraping styles it would appear as it should inherit borders from the cells
-                 * before but in fact there should be no borders. We have to think about it that there is no inheritance with css, every
-                 * cell has its own full set of css and is not dependent on preceding cells. For example background wouldnt show up as well
-                 * but since we dont use transparent background but instead every cell is white by default, when cell should appear transparent
-                 * it is set back to 000000 thus breaking the inheritance.
-                 *
-                 * @todo soooooo fiddly
-                 */
-
-                // This goes through all excel styles and if cell doesnt have that style it adds it
-                for (let eStyle in this.excelStyles) {
-                    if (!this.excelStyles.hasOwnProperty(eStyle)) {
-                        continue;
-                    }
-
-                    if (eStyle === "text-wrap") {
-                        continue;
-                    }
-
-                    if (!genericStyle[eStyle]) {
-                        genericStyle[eStyle] = "none";
-                    }
-                }
-            }
-
-            return genericStyle;
-        }
-
-        public cleanUpReversed(content: IPageContent): IPageContent{
-            let styleCurrent: IPageCellStyle = {};
-
-            for (let i: number = 0; i < content.length; i++) {
-                for (let j: number = 0; j < content[i].length; j++) {
-                    let styleCopy: any = angular.copy(content[i][j].style);
-
-                    for (let styleName in styleCopy) {
-                        if (!styleCopy.hasOwnProperty(styleName)){
-                            continue;
-                        }
-
-                        if (styleCurrent[styleName] && (styleCurrent[styleName] === styleCopy[styleName])) {
-                            // This style is inherited from somewhere else so delete it from this cell
-                            delete content[i][j].style[styleName];
-                        } else {
-                            // Its different so save it for others to inherit
-                            styleCurrent[styleName] = styleCopy[styleName];
-                        }
-                    }
-
-                    if (!Object.keys(content[i][j].style).length) {
-                        delete content[i][j].style;
-                    }
-                }
-            }
-
-            return content;
-        }
-
-        /**
-         * Helper function to get right css name of style based on excel name
-         * @param val
-         * @returns {*}
-         */
-        private excelToCSS(val: string): string {
-            return (this.excelStyles[val]) ? this.excelStyles[val] : val;
-        }
-
-        /**
-         * Helper function to get right excel style name based on css name
-         * @param val
-         * @returns {*}
-         * @constructor
-         */
-        private CSSToExcel(val: string): string {
-            let excelVal: string = val;
-
-            for (let style in this.excelStyles) {
-                if (this.excelStyles[style] === val) {
-                    excelVal = style;
-                    break;
-                }
-            }
-
-            return excelVal;
-        }
-
-        /**
-         * Helper to get excel border weight value based on css pixel value
-         * @param pixels
-         * @returns {string}
-         */
-        private excelBorderWeight(pixels: number): string {
-            let bWeight: string = "";
-
-            for (let weight in this.excelBorderWeights) {
-                if (this.excelBorderWeights[weight] === pixels) {
-                    bWeight = weight;
-                    break;
-                }
-            }
-
-            return bWeight;
-        }
-
-        private rgbToHex(rgb: string): string {
-            rgb = rgb.replace("rgb(", "").replace(")", "");
-            let parts: string[] = rgb.split(",");
-
-            return this.componentToHex(parseInt(parts[0], 10)) + this.componentToHex(parseInt(parts[1], 10)) + this.componentToHex(parseInt(parts[2], 10));
-        }
-
-        private componentToHex(c): string {
-            let hex: string = c.toString(16);
-            return hex.length === 1 ? "0" + hex : hex;
-        }
     }
 }

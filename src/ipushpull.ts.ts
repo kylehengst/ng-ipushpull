@@ -20,6 +20,7 @@ namespace ipushpull {
             let defaults: any = {
                 api_url: "https://www.ipushpull.com/api/1.0",
                 ws_url: "https://www.ipushpull.com",
+                storage_prefix: "",
             };
 
             if (config.api_url && !config.ws_url){
