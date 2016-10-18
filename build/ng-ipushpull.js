@@ -1367,6 +1367,7 @@ var ipushpull;
             return q.promise;
         };
         Page.prototype.saveMeta = function (data) {
+            var _this = this;
             var q = $q.defer();
             delete data.access_rights;
             if (data.encryption_type_to_use === 0) {
@@ -1376,7 +1377,10 @@ var ipushpull;
                 domainId: this._folderId,
                 pageId: this._pageId,
                 data: data,
-            }).then(q.resolve, function (err) {
+            }).then(function (res) {
+                _this._data = angular.extend({}, _this._data, res.data);
+                q.resolve(res);
+            }, function (err) {
                 q.reject(ipushpull.Utils.parseApiError(err, "Could not save page settings"));
             });
             return q.promise;

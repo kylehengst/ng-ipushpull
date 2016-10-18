@@ -529,7 +529,11 @@ namespace ipushpull {
                 domainId: this._folderId,
                 pageId: this._pageId,
                 data: data,
-            }).then(q.resolve, (err) => {
+            }).then((res) => {
+                // Apply data to current object
+                this._data = angular.extend({}, this._data, res.data);
+                q.resolve(res);
+            }, (err) => {
                 q.reject(ipushpull.Utils.parseApiError(err, "Could not save page settings"));
             });
 
