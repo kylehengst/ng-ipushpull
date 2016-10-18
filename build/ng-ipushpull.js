@@ -423,16 +423,18 @@ var ipushpull;
     "use strict";
     var Auth = (function (_super) {
         __extends(Auth, _super);
-        function Auth($q, ippApi, storage, config) {
+        function Auth($q, $timeout, ippApi, storage, config) {
             var _this = this;
             _super.call(this);
             this.$q = $q;
+            this.$timeout = $timeout;
             this.ippApi = ippApi;
             this.storage = storage;
             this.config = config;
             this._user = {};
             this._authenticated = false;
             this._authInProgress = false;
+            this._selfTimeout = 15 * 1000;
             this.on401 = function () {
                 _this.ippApi.block();
                 _this.storage.persistent.remove("access_token");
@@ -478,6 +480,11 @@ var ipushpull;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Auth.prototype, "EVENT_USER_UPDATED", {
+            get: function () { return "user_updated"; },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Auth.prototype, "user", {
             get: function () { return this._user; },
             enumerable: true,
@@ -502,6 +509,7 @@ var ipushpull;
                     _this._authenticated = true;
                     _this.storage.user.suffix = _this._user.id;
                     _this.emit(_this.EVENT_LOGGED_IN);
+                    _this.startPollingSelf();
                 }
                 q.resolve();
             }, function (err) {
@@ -554,6 +562,7 @@ var ipushpull;
             this.storage.persistent.remove("access_token");
             this.storage.persistent.remove("refresh_token");
             this._authenticated = false;
+            this.$timeout.cancel(this._selfTimer);
             this.storage.user.suffix = "GUEST";
             this.emit(this.EVENT_LOGGED_OUT);
         };
@@ -593,12 +602,26 @@ var ipushpull;
             var _this = this;
             var q = this.$q.defer();
             this.ippApi.getSelfInfo().then(function (res) {
-                _this._user = res.data;
+                if (!angular.equals(_this._user, res.data)) {
+                    _this._user = res.data;
+                    _this.emit(_this.EVENT_USER_UPDATED);
+                }
                 q.resolve();
             }, q.reject);
             return q.promise;
         };
-        Auth.$inject = ["$q", "ippApiService", "ippStorageService", "ippConfig"];
+        Auth.prototype.startPollingSelf = function () {
+            var _this = this;
+            this.$timeout.cancel(this._selfTimer);
+            this._selfTimer = this.$timeout(function () {
+                _this.getUserInfo()
+                    .then(angular.noop, angular.noop)
+                    .finally(function () {
+                    _this.startPollingSelf();
+                });
+            }, this._selfTimeout);
+        };
+        Auth.$inject = ["$q", "$timeout", "ippApiService", "ippStorageService", "ippConfig"];
         return Auth;
     }(EventEmitter));
     ipushpull.module.service("ippAuthService", Auth);
@@ -724,6 +747,9 @@ var ipushpull;
             this._current = PageStyles.decompressStyles(current);
             if (!this._current.length) {
                 this.addRow(0);
+            }
+            if (!this._current[0].length) {
+                this.addColumn(0);
             }
         };
         PageContent.prototype.getCell = function (rowIndex, columnIndex) {
@@ -1312,12 +1338,16 @@ var ipushpull;
             configurable: true
         });
         Page.prototype.start = function () {
-            this._provider.start();
-            this.updatesOn = true;
+            if (!this.updatesOn) {
+                this._provider.start();
+                this.updatesOn = true;
+            }
         };
         Page.prototype.stop = function () {
-            this._provider.stop();
-            this.updatesOn = false;
+            if (this.updatesOn) {
+                this._provider.stop();
+                this.updatesOn = false;
+            }
         };
         Page.prototype.push = function (forceFull) {
             var _this = this;

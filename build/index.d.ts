@@ -1251,6 +1251,7 @@ declare namespace ipushpull {
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
         EVENT_401: string;
+        EVENT_USER_UPDATED: string;
         user: IUserSelf;
         authenticate: (force?: boolean) => IPromise<any>;
         login: (username: string, password: string) => IPromise<any>;
@@ -1547,6 +1548,7 @@ declare namespace ipushpull {
         ready: boolean;
         decrypted: boolean;
         updatesOn: boolean;
+        types: IPageTypes;
         encryptionKeyPull: IEncryptionKey;
         encryptionKeyPush: IEncryptionKey;
         data: IPage;
