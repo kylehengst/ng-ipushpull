@@ -500,7 +500,7 @@ namespace ipushpull {
                 q.resolve(data);
             };
 
-            if (!this._data.encryption_type_to_use && this.Content.canDoDelta && !forceFull){
+            if (!this._data.encryption_type_to_use && !this._data.encryption_type_used && this.Content.canDoDelta && !forceFull){
                 this.pushDelta(<IPageDelta>this.Content.getDelta()).then(onSuccess, q.reject);
             } else {
                 this.pushFull(<IPageContent>this.Content.getFull()).then(onSuccess, q.reject);
@@ -532,6 +532,7 @@ namespace ipushpull {
             }).then((res) => {
                 // Apply data to current object
                 this._data = angular.extend({}, this._data, res.data);
+                // this.emit(this.EVENT_NEW_META, res.data); // @todo I am not sure about this...
                 q.resolve(res);
             }, (err) => {
                 q.reject(ipushpull.Utils.parseApiError(err, "Could not save page settings"));
