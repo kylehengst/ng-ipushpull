@@ -4,6 +4,7 @@ namespace ipushpull {
     import IPromise = angular.IPromise;
     import IDeferred = angular.IDeferred;
     import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    import ITimeoutService = angular.ITimeoutService;
 
     export interface IAuthService extends IEventEmitter {
         EVENT_LOGGED_IN: string;
@@ -12,6 +13,7 @@ namespace ipushpull {
         EVENT_LOGGED_OUT: string;
         EVENT_ERROR: string;
         EVENT_401: string;
+        EVENT_USER_UPDATED: string;
 
         user: IUserSelf;
 
@@ -39,7 +41,7 @@ namespace ipushpull {
     }
 
     class Auth extends EventEmitter {
-        public static $inject: string[] = ["$q", "ippApiService", "ippStorageService", "ippConfig"];
+        public static $inject: string[] = ["$q", "$timeout", "ippApiService", "ippStorageService", "ippConfig"];
 
         public get EVENT_LOGGED_IN(): string { return "logged_in"; } // emitted when logged in (not on login refresh)
         public get EVENT_RE_LOGGING(): string { return "re_logging"; } // emitted when re-logging started
@@ -48,13 +50,18 @@ namespace ipushpull {
         public get EVENT_ERROR(): string { return "error"; }
         public get EVENT_401(): string { return "401"; } // listener
 
+        public get EVENT_USER_UPDATED(): string { return "user_updated"; }
+
         private _user: IUserSelf | any = {};
         private _authenticated: boolean = false;
         private _authInProgress: boolean = false;
 
+        private _selfTimer: any;
+        private _selfTimeout: number = 15 * 1000; // @todo Should not be hardcoded
+
         public get user(): IUserSelf { return this._user; }
 
-        constructor(private $q: IQService, private ippApi: IApiService, private storage: IStorageService, private config: any){
+        constructor(private $q: IQService, private $timeout: ITimeoutService, private ippApi: IApiService, private storage: IStorageService, private config: any){
             super();
 
             this.on("401", this.on401);
@@ -84,6 +91,8 @@ namespace ipushpull {
                     this.storage.user.suffix = this._user.id;
 
                     this.emit(this.EVENT_LOGGED_IN);
+
+                    this.startPollingSelf();
                 }
 
                 q.resolve();
@@ -146,6 +155,8 @@ namespace ipushpull {
 
             this._authenticated = false;
 
+            this.$timeout.cancel(this._selfTimer);
+
             // @todo oh no....
             this.storage.user.suffix = "GUEST";
 
@@ -192,11 +203,26 @@ namespace ipushpull {
             let q: IDeferred<IUserSelf> = this.$q.defer();
 
             this.ippApi.getSelfInfo().then((res) => {
-                this._user = res.data; // going outside function scope..
+                if (!angular.equals(this._user, res.data)) {
+                    this._user = res.data; // going outside function scope..
+                    this.emit(this.EVENT_USER_UPDATED);
+                }
                 q.resolve();
             }, q.reject);
 
             return q.promise;
+        }
+
+        private startPollingSelf(): void {
+            this.$timeout.cancel(this._selfTimer);
+
+            this._selfTimer = this.$timeout(() => {
+                this.getUserInfo()
+                    .then(angular.noop, angular.noop)
+                    .finally(() => {
+                        this.startPollingSelf();
+                    });
+            }, this._selfTimeout);
         }
 
         private on401: any = () => {
