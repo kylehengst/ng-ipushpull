@@ -1300,18 +1300,6 @@ declare namespace ipushpull {
 }
 
 declare namespace ipushpull {
-    import IPromise = angular.IPromise;
-    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
-    interface IPageTypes {
-        regular: number;
-        pageAccessReport: number;
-        domainUsageReport: number;
-        globalUsageReport: number;
-        pageUpdateReport: number;
-        alert: number;
-        pdf: number;
-        liveUsage: number;
-    }
     interface IPageContentLink {
         external: boolean;
         address: string;
@@ -1343,13 +1331,75 @@ declare namespace ipushpull {
     }
     interface IPageContentCell {
         value: string;
-        formatted_value: string;
+        formatted_value?: string;
         link?: IPageContentLink;
         style?: IPageCellStyle;
+        dirty?: boolean;
     }
-    interface IPageContent {
-        length: number;
+    interface IPageContent extends Array<any> {
         [index: number]: IPageContentCell[];
+    }
+    interface IPageDeltaContentCol {
+        col_index: number;
+        cell_content: IPageContentCell;
+    }
+    interface IPageDeltaContentRow {
+        row_index: number;
+        cols: IPageDeltaContentCol[];
+    }
+    interface IPageDelta {
+        new_rows: number[];
+        new_cols: number[];
+        content_delta: IPageDeltaContentRow[];
+    }
+}
+declare namespace ipushpull {
+    interface IPageContentProvider {
+        canDoDelta: boolean;
+        update: (rawContent: IPageContent) => void;
+        getCell: (rowIndex: number, columnIndex: number) => IPageContentCell;
+        updateCell: (rowIndex: number, columnIndex: number, data: IPageContentCell) => void;
+        addRow: () => void;
+        addColumn: () => void;
+        removeRow: () => void;
+        removeColumn: () => void;
+        getDelta: () => IPageDelta;
+        getFull: () => IPageContent;
+        cleanDirty: () => void;
+    }
+    class PageContent implements IPageContentProvider {
+        canDoDelta: boolean;
+        private _original;
+        private _current;
+        private _newRows;
+        private _newCols;
+        current: IPageContent;
+        constructor(rawContent?: IPageContent);
+        update(rawContent: IPageContent): void;
+        getCell(rowIndex: number, columnIndex: number): IPageContentCell;
+        updateCell(rowIndex: number, columnIndex: number, data: IPageContentCell): void;
+        addRow(index?: number): IPageContentCell[];
+        addColumn(index?: number): void;
+        removeRow(): void;
+        removeColumn(): void;
+        getDelta(): IPageDelta;
+        getFull(): IPageContent;
+        cleanDirty(): void;
+    }
+}
+
+declare namespace ipushpull {
+    import IPromise = angular.IPromise;
+    import IEventEmitter = Wolfy87EventEmitter.EventEmitter;
+    interface IPageTypes {
+        regular: number;
+        pageAccessReport: number;
+        domainUsageReport: number;
+        globalUsageReport: number;
+        pageUpdateReport: number;
+        alert: number;
+        pdf: number;
+        liveUsage: number;
     }
     interface IPageServiceContent {
         id: number;
@@ -1399,19 +1449,6 @@ declare namespace ipushpull {
         seq_no: number;
         show_gridlines: boolean;
         special_page_type: number;
-    }
-    interface IPageDeltaContentCol {
-        col_index: number;
-        cell_content: IPageContentCell;
-    }
-    interface IPageDeltaContentRow {
-        row_index: number;
-        cols: IPageDeltaContentCol[];
-    }
-    interface IPageDelta {
-        new_rows: number[];
-        new_cols: number[];
-        content_delta: IPageDeltaContentRow[];
     }
     interface IPage extends IPageServiceMeta {
     }
@@ -1514,10 +1551,11 @@ declare namespace ipushpull {
         encryptionKeyPush: IEncryptionKey;
         data: IPage;
         access: IUserPageAccess;
-        Ranges: any;
+        Content: IPageContentProvider;
+        Ranges: IPageRangesCollection;
         start: () => void;
         stop: () => void;
-        push: (data: IPageContent | IPageDelta, delta?: boolean, encryptionKey?: IEncryptionKey) => IPromise<any>;
+        push: (forceFull?: boolean) => IPromise<any>;
         saveMeta: (data: any) => IPromise<any>;
         destroy: () => void;
         decrypt: (key: IEncryptionKey) => void;
@@ -1595,6 +1633,7 @@ declare namespace ipushpull {
 declare namespace ipushpull {
     interface IUtils {
         parseApiError: (err: any, def: string) => string;
+        clonePageContent: (content: IPageContent) => IPageContent;
     }
     let Utils: IUtils;
 }
