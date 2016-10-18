@@ -157,6 +157,7 @@ declare namespace ipushpull {
         ready: boolean;
         decrypted: boolean;
         updatesOn: boolean;
+        types: IPageTypes;
         encryptionKeyPull: IEncryptionKey;
         encryptionKeyPush: IEncryptionKey;
         data: IPage;

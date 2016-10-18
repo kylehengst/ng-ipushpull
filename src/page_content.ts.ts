@@ -142,7 +142,9 @@ namespace ipushpull {
                 this.addRow(0);
             }
 
-            // @todo add new column if no column in a row
+            if (!this._current[0].length){
+                this.addColumn(0);
+            }
         }
 
         public getCell(rowIndex: number, columnIndex: number): IPageContentCell {

@@ -183,6 +183,7 @@ namespace ipushpull {
         ready: boolean;
         decrypted: boolean;
         updatesOn: boolean;
+        types: IPageTypes;
 
         encryptionKeyPull: IEncryptionKey;
         encryptionKeyPush: IEncryptionKey;
@@ -469,16 +470,20 @@ namespace ipushpull {
          * Start page updates
          */
         public start(): void{
-            this._provider.start();
-            this.updatesOn = true;
+            if (!this.updatesOn) {
+                this._provider.start();
+                this.updatesOn = true;
+            }
         }
 
         /**
          * Stop page updates
          */
         public stop(): void{
-            this._provider.stop();
-            this.updatesOn = false;
+            if (this.updatesOn) {
+                this._provider.stop();
+                this.updatesOn = false;
+            }
         }
 
         /**
