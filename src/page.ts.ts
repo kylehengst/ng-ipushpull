@@ -660,7 +660,7 @@ namespace ipushpull {
 
             // Create new page
             Page.create(folderId, name, this._data.special_page_type).then((newPage: IPageService) => {
-                newPage.Content = new PageContent(this._data.content);
+                newPage.Content = this.Content;
 
                 $q.all([
                     // @todo Page Settings
