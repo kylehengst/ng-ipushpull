@@ -742,6 +742,7 @@ namespace ipushpull {
                 this.emit(this.EVENT_ACCESS_UPDATED);
                 q.resolve();
             }, (err) => {
+                this.onPageError(err);
                 // @todo Should we emit something?
                 // @todo Handle error?
                 q.reject();
@@ -787,17 +788,20 @@ namespace ipushpull {
                 this.emit(this.EVENT_NEW_META, data);
             });
 
-            this._provider.on("error", (err) => {
-                err.code = err.httpCode || err.code;
-                err.message = err.httpText || err.message;
-
-                this.emit(this.EVENT_ERROR, err);
-
-                if (err.code === 404){
-                    this.destroy();
-                }
-            });
+            this._provider.on("error", this.onPageError);
         }
+
+        private onPageError: any = (err) => {
+            err.code = err.httpCode || err.code;
+            err.message = err.httpText || err.message;
+
+            this.emit(this.EVENT_ERROR, err);
+
+            // @todo Should not be here - cannot destroy this without user knowing about it
+            if (err.code === 404){
+                this.destroy();
+            }
+        };
 
         /**
          * Push full content update
