@@ -8427,6 +8427,14 @@ var ipushpull;
                 name: "",
                 passphrase: "",
             };
+            this.onPageError = function (err) {
+                err.code = err.httpCode || err.code;
+                err.message = err.httpText || err.message;
+                _this.emit(_this.EVENT_ERROR, err);
+                if (err.code === 404) {
+                    _this.destroy();
+                }
+            };
             this.types = {
                 regular: this.TYPE_REGULAR,
                 pageAccessReport: this.TYPE_PAGE_ACCESS_REPORT,
@@ -8752,6 +8760,7 @@ var ipushpull;
                 _this.emit(_this.EVENT_ACCESS_UPDATED);
                 q.resolve();
             }, function (err) {
+                _this.onPageError(err);
                 q.reject();
             });
             return q.promise;
@@ -8776,14 +8785,7 @@ var ipushpull;
                 _this.checkReady();
                 _this.emit(_this.EVENT_NEW_META, data);
             });
-            this._provider.on("error", function (err) {
-                err.code = err.httpCode || err.code;
-                err.message = err.httpText || err.message;
-                _this.emit(_this.EVENT_ERROR, err);
-                if (err.code === 404) {
-                    _this.destroy();
-                }
-            });
+            this._provider.on("error", this.onPageError);
         };
         Page.prototype.pushFull = function (content) {
             var _this = this;
