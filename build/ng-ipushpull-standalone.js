@@ -8601,7 +8601,7 @@ var ipushpull;
                 _this._data.seq_no++;
                 q.resolve(data);
             };
-            if (!this._data.encryption_type_to_use && this.Content.canDoDelta && !forceFull) {
+            if (!this._data.encryption_type_to_use && !this._data.encryption_type_used && this.Content.canDoDelta && !forceFull) {
                 this.pushDelta(this.Content.getDelta()).then(onSuccess, q.reject);
             }
             else {
@@ -8703,7 +8703,7 @@ var ipushpull;
                 options.clone_ranges = false;
             }
             Page.create(folderId, name, this._data.special_page_type).then(function (newPage) {
-                newPage.Content = new ipushpull.PageContent(_this._data.content);
+                newPage.Content = _this.Content;
                 $q.all([
                     newPage.push(true),
                 ]).then(function (res) {
