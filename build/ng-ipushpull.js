@@ -717,7 +717,7 @@ var ipushpull;
             configurable: true
         });
         PageContent.prototype.update = function (rawContent) {
-            this._original = rawContent;
+            this._original = ipushpull.Utils.clonePageContent(rawContent);
             var current = ipushpull.Utils.clonePageContent(this._current);
             for (var i = 0; i < current.length; i++) {
                 if (rawContent[i] && (current[i].length > rawContent[i].length)) {
@@ -751,6 +751,10 @@ var ipushpull;
             if (!this._current[0].length) {
                 this.addColumn(0);
             }
+        };
+        PageContent.prototype.reset = function () {
+            this.cleanDirty();
+            this.update(this._original);
         };
         PageContent.prototype.getCell = function (rowIndex, columnIndex) {
             if (!this._current[rowIndex]) {
@@ -1363,7 +1367,8 @@ var ipushpull;
             var q = $q.defer();
             var onSuccess = function (data) {
                 _this.Content.cleanDirty();
-                _this._data.seq_no++;
+                _this.Content.update(_this.Content.getFull());
+                angular.extend({}, _this._data, data);
                 q.resolve(data);
             };
             if (!this._data.encryption_type_to_use && !this._data.encryption_type_used && this.Content.canDoDelta && !forceFull) {

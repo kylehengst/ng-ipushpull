@@ -1358,6 +1358,7 @@ declare namespace ipushpull {
     interface IPageContentProvider {
         canDoDelta: boolean;
         update: (rawContent: IPageContent) => void;
+        reset: () => void;
         getCell: (rowIndex: number, columnIndex: number) => IPageContentCell;
         updateCell: (rowIndex: number, columnIndex: number, data: IPageContentCell) => void;
         addRow: () => void;
@@ -1377,6 +1378,7 @@ declare namespace ipushpull {
         current: IPageContent;
         constructor(rawContent?: IPageContent);
         update(rawContent: IPageContent): void;
+        reset(): void;
         getCell(rowIndex: number, columnIndex: number): IPageContentCell;
         updateCell(rowIndex: number, columnIndex: number, data: IPageContentCell): void;
         addRow(index?: number): IPageContentCell[];
