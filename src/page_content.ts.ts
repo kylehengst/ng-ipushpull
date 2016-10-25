@@ -68,6 +68,7 @@ namespace ipushpull {
         canDoDelta: boolean;
 
         update: (rawContent: IPageContent) => void;
+        reset: () => void;
         getCell: (rowIndex: number, columnIndex: number) => IPageContentCell;
         updateCell: (rowIndex: number, columnIndex: number, data: IPageContentCell) => void;
         addRow: () => void;
@@ -95,7 +96,7 @@ namespace ipushpull {
         }
 
         public update(rawContent: IPageContent): void{
-            this._original = rawContent;
+            this._original = Utils.clonePageContent(rawContent);
 
             let current: IPageContent = Utils.clonePageContent(this._current);
 
@@ -145,6 +146,11 @@ namespace ipushpull {
             if (!this._current[0].length){
                 this.addColumn(0);
             }
+        }
+
+        public reset(): void {
+            this.cleanDirty();
+            this.update(this._original);
         }
 
         public getCell(rowIndex: number, columnIndex: number): IPageContentCell {

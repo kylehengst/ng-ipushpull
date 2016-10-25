@@ -496,7 +496,9 @@ namespace ipushpull {
 
             let onSuccess: any = (data) => {
                 this.Content.cleanDirty();
-                this._data.seq_no++;
+                this.Content.update(this.Content.getFull()); // @todo Ouch!
+                // @todo this._data.content has old value
+                angular.extend({}, this._data, data);
                 q.resolve(data);
             };
 
