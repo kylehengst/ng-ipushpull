@@ -7962,13 +7962,15 @@ var ipushpull;
         PageContent.prototype.update = function (rawContent) {
             this._original = ipushpull.Utils.clonePageContent(rawContent);
             var current = ipushpull.Utils.clonePageContent(this._current);
-            for (var i = 0; i < current.length; i++) {
-                if (rawContent[i] && (current[i].length > rawContent[i].length)) {
-                    current[i].splice(-(current[i].length - rawContent[i].length));
-                }
-                if (!rawContent[i]) {
-                    current.splice(i, current.length - i);
-                    break;
+            for (var i = 0; i < this._newRows.length; i++) {
+                rawContent.splice(this._newRows[i], 0, current[i]);
+            }
+            for (var i = 0; i < this._newCols.length; i++) {
+                for (var j = 0; j < rawContent.length; j++) {
+                    if (this._newRows.indexOf(j) >= 0) {
+                        continue;
+                    }
+                    rawContent[j].splice(this._newCols[i], 0, current[j][i]);
                 }
             }
             for (var i = 0; i < rawContent.length; i++) {
@@ -8061,6 +8063,7 @@ var ipushpull;
                         value: "",
                         formatted_value: "",
                         style: (index) ? angular.copy(this._current[i][index - 1].style) : {},
+                        dirty: true,
                     };
                     this._current[i].splice(index, 0, data);
                 }
