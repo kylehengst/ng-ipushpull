@@ -7998,6 +7998,14 @@ var ipushpull;
             }
         };
         PageContent.prototype.reset = function () {
+            for (var i = 0; i < this._newRows.length; i++) {
+                this._current.splice(this._newRows[i], 1);
+            }
+            for (var i = 0; i < this._newCols.length; i++) {
+                for (var j = 0; j < this._current.length; j++) {
+                    this._current[j].splice(this._newCols[i], 1);
+                }
+            }
             this.cleanDirty();
             this.update(this._original);
         };
