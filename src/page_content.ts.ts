@@ -151,6 +151,17 @@ namespace ipushpull {
         }
 
         public reset(): void {
+            // Remove new rows and columns
+            for (let i: number = 0; i < this._newRows.length; i++){
+                this._current.splice(this._newRows[i], 1);
+            }
+
+            for (let i: number = 0; i < this._newCols.length; i++){
+                for (let j: number = 0; j < this._current.length; j++){
+                    this._current[j].splice(this._newCols[i], 1);
+                }
+            }
+
             this.cleanDirty();
             this.update(this._original);
         }
