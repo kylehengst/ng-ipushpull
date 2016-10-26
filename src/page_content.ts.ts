@@ -100,30 +100,32 @@ namespace ipushpull {
 
             let current: IPageContent = Utils.clonePageContent(this._current);
 
-            // Remove extra rows and columns - @todo do we want to do this?
-            for (let i: number = 0; i < current.length; i++){
-                // Delete extra columns
-                if (rawContent[i] && (current[i].length > rawContent[i].length)){
-                    current[i].splice(-(current[i].length - rawContent[i].length));
-                }
+            // Extend the matrix of incoming content
+            for (let i: number = 0; i < this._newRows.length; i++){
+                rawContent.splice(this._newRows[i], 0, current[i]);
+            }
 
-                // Delete all rows from now on
-                if (!rawContent[i]){
-                    current.splice(i, current.length - i);
-                    break;
+            for (let i: number = 0; i < this._newCols.length; i++){
+                for (let j: number = 0; j < rawContent.length; j++){
+                    // Skip new rows because they are already in right matrix
+                    if (this._newRows.indexOf(j) >= 0){
+                        continue;
+                    }
+
+                    rawContent[j].splice(this._newCols[i], 0, current[j][i]);
                 }
             }
 
-            // Update only non-touched cells
+            // Now that we have same dimensions of matrix we can update only non-touched cells
             for (let i: number = 0; i < rawContent.length; i++){
-                // New rows
-                // @todo do something about delta?
+                // New rows (end of table)
                 if (!current[i]){
                     current.push(rawContent[i]);
                     continue;
                 }
 
                 for (let j: number = 0; j < rawContent[i].length; j++){
+                    // New columns (end of table)
                     if (!current[i][j]){
                         current[i].push(rawContent[i][j]);
                         continue;
@@ -236,6 +238,7 @@ namespace ipushpull {
                         value: "",
                         formatted_value: "",
                         style: (index) ? angular.copy(this._current[i][index - 1].style) : {},
+                        dirty: true,
                     };
 
                     this._current[i].splice(index, 0, data);
