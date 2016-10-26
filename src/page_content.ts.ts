@@ -199,13 +199,13 @@ namespace ipushpull {
                     newRowData[i].value = "";
                     newRowData[i].formatted_value = "";
 
-                    // Copy over styles
-                    // @todo Is this correct?
+                    // Make sure we have style object
                     newRowData[i].style = (newRowData[i].style) ? newRowData[i].style : {};
 
                     newRowData[i].dirty = true;
                 }
             } else {
+                // Not marking as dirty, this is just to have something to show
                 newRowData.push({
                     value: "",
                 });
@@ -392,6 +392,9 @@ namespace ipushpull {
                     delete this._current[i][j].dirty;
                 }
             }
+
+            this._newCols = [];
+            this._newRows = [];
         }
     }
 

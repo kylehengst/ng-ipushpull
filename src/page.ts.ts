@@ -498,7 +498,12 @@ namespace ipushpull {
                 this.Content.cleanDirty();
                 this.Content.update(this.Content.getFull()); // @todo Ouch!
                 // @todo this._data.content has old value
-                angular.extend({}, this._data, data);
+                this._data = angular.extend({}, this._data, data.data);
+
+                if (this._provider instanceof ProviderREST){
+                    this._provider.seqNo = this._data.seq_no;
+                }
+
                 q.resolve(data);
             };
 
@@ -1219,6 +1224,8 @@ namespace ipushpull {
         private _timeout: number = 1000;
 
         private _seqNo: number = 0;
+
+        public set seqNo(seqNo: number) { this._seqNo = seqNo; };
 
         constructor(private _pageId?: number, private _folderId?: number){
             super();
