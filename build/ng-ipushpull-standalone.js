@@ -8168,6 +8168,8 @@ var ipushpull;
                     delete this._current[i][j].dirty;
                 }
             }
+            this._newCols = [];
+            this._newRows = [];
         };
         return PageContent;
     }());
@@ -8611,7 +8613,10 @@ var ipushpull;
             var onSuccess = function (data) {
                 _this.Content.cleanDirty();
                 _this.Content.update(_this.Content.getFull());
-                angular.extend({}, _this._data, data);
+                _this._data = angular.extend({}, _this._data, data.data);
+                if (_this._provider instanceof ProviderREST) {
+                    _this._provider.seqNo = _this._data.seq_no;
+                }
                 q.resolve(data);
             };
             if (!this._data.encryption_type_to_use && !this._data.encryption_type_used && this.Content.canDoDelta && !forceFull) {
@@ -9066,6 +9071,12 @@ var ipushpull;
             this._seqNo = 0;
             this.start();
         }
+        Object.defineProperty(ProviderREST.prototype, "seqNo", {
+            set: function (seqNo) { this._seqNo = seqNo; },
+            enumerable: true,
+            configurable: true
+        });
+        ;
         ProviderREST.prototype.start = function () {
             this._stopped = false;
             this.startPolling();
