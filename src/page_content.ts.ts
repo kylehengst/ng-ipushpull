@@ -83,8 +83,8 @@ namespace ipushpull {
     export class PageContent implements IPageContentProvider {
         public canDoDelta: boolean = true;
 
-        private _original: IPageContent = [];
-        private _current: IPageContent = [];
+        private _original: IPageContent = [[]];
+        private _current: IPageContent = [[]];
 
         private _newRows: number[] = [];
         private _newCols: number[] = [];
@@ -108,13 +108,20 @@ namespace ipushpull {
             for (let i: number = 0; i < this._newCols.length; i++){
                 for (let j: number = 0; j < rawContent.length; j++){
                     // Skip new rows because they are already in right matrix
-                    if (this._newRows.indexOf(j) >= 0){
+                    if (this._newRows.indexOf(j) >= 0 || j >= current.length){
                         continue;
                     }
 
                     rawContent[j].splice(this._newCols[i], 0, current[j][i]);
                 }
             }
+
+            // Shrink matrix to incoming matrix if possible
+            if (rawContent.length < current.length){
+                // @todo Loop through current from rawContent.length and remove rows that are not marked as new and recalculate other new rows
+            }
+
+            // @todo Do same for columns
 
             // Now that we have same dimensions of matrix we can update only non-touched cells
             for (let i: number = 0; i < rawContent.length; i++){
@@ -139,15 +146,12 @@ namespace ipushpull {
                 }
             }
 
+            // Empty content
+            if (!current[0].length) {
+                current[0][0] = {value: "", formatted_value: ""};
+            }
+
             this._current = PageStyles.decompressStyles(current);
-
-            if (!this._current.length){
-                this.addRow(0);
-            }
-
-            if (!this._current[0].length){
-                this.addColumn(0);
-            }
         }
 
         public reset(): void {
@@ -205,6 +209,7 @@ namespace ipushpull {
 
             let newRowData: IPageContentCell[] = [];
 
+            // Clone row before
             if (this._current.length) {
                 newRowData = angular.copy(this._current[index - 1]);
                 for (let i: number = 0; i < newRowData.length; i++) {
@@ -217,11 +222,6 @@ namespace ipushpull {
 
                     newRowData[i].dirty = true;
                 }
-            } else {
-                // Not marking as dirty, this is just to have something to show
-                newRowData.push({
-                    value: "",
-                });
             }
 
             this._current.splice(index, 0, newRowData);
@@ -243,20 +243,21 @@ namespace ipushpull {
                 index = (this._current.length) ? this._current[0].length : 0;
             }
 
-            if (this._current.length) {
-                for (let i: number = 0; i < this._current.length; i++) {
-                    let data: IPageContentCell = {
-                        value: "",
-                        formatted_value: "",
-                        style: (index) ? angular.copy(this._current[i][index - 1].style) : {},
-                        dirty: true,
-                    };
+            if (!this._current.length){
+                this.addRow(0);
+                return;
+            }
 
-                    this._current[i].splice(index, 0, data);
-                }
-            } else {
-                let data: IPageContent = [[{value: "", formatted_value: "", style: {}}]];
-                this._current.push(data);
+            // Clone previous column
+            for (let i: number = 0; i < this._current.length; i++) {
+                let data: IPageContentCell = {
+                    value: "",
+                    formatted_value: "",
+                    style: (index) ? angular.copy(this._current[i][index - 1].style) : {},
+                    dirty: true,
+                };
+
+                this._current[i].splice(index, 0, data);
             }
 
             // If we added columns before, we need to change their index
