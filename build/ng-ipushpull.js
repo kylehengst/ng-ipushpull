@@ -705,8 +705,8 @@ var ipushpull;
         function PageContent(rawContent) {
             if (rawContent === void 0) { rawContent = [[]]; }
             this.canDoDelta = true;
-            this._original = [];
-            this._current = [];
+            this._original = [[]];
+            this._current = [[]];
             this._newRows = [];
             this._newCols = [];
             this.update(rawContent);
@@ -724,11 +724,13 @@ var ipushpull;
             }
             for (var i = 0; i < this._newCols.length; i++) {
                 for (var j = 0; j < rawContent.length; j++) {
-                    if (this._newRows.indexOf(j) >= 0) {
+                    if (this._newRows.indexOf(j) >= 0 || j >= current.length) {
                         continue;
                     }
                     rawContent[j].splice(this._newCols[i], 0, current[j][i]);
                 }
+            }
+            if (rawContent.length < current.length) {
             }
             for (var i = 0; i < rawContent.length; i++) {
                 if (!current[i]) {
@@ -746,13 +748,10 @@ var ipushpull;
                     current[i][j] = rawContent[i][j];
                 }
             }
+            if (!current[0].length) {
+                current[0][0] = { value: "", formatted_value: "" };
+            }
             this._current = PageStyles.decompressStyles(current);
-            if (!this._current.length) {
-                this.addRow(0);
-            }
-            if (!this._current[0].length) {
-                this.addColumn(0);
-            }
         };
         PageContent.prototype.reset = function () {
             for (var i = 0; i < this._newRows.length; i++) {
@@ -804,11 +803,6 @@ var ipushpull;
                     newRowData[i].dirty = true;
                 }
             }
-            else {
-                newRowData.push({
-                    value: "",
-                });
-            }
             this._current.splice(index, 0, newRowData);
             for (var i = 0; i < this._newRows.length; i++) {
                 if (this._newRows[i] >= (index)) {
@@ -822,20 +816,18 @@ var ipushpull;
             if (!index) {
                 index = (this._current.length) ? this._current[0].length : 0;
             }
-            if (this._current.length) {
-                for (var i = 0; i < this._current.length; i++) {
-                    var data = {
-                        value: "",
-                        formatted_value: "",
-                        style: (index) ? angular.copy(this._current[i][index - 1].style) : {},
-                        dirty: true,
-                    };
-                    this._current[i].splice(index, 0, data);
-                }
+            if (!this._current.length) {
+                this.addRow(0);
+                return;
             }
-            else {
-                var data = [[{ value: "", formatted_value: "", style: {} }]];
-                this._current.push(data);
+            for (var i = 0; i < this._current.length; i++) {
+                var data = {
+                    value: "",
+                    formatted_value: "",
+                    style: (index) ? angular.copy(this._current[i][index - 1].style) : {},
+                    dirty: true,
+                };
+                this._current[i].splice(index, 0, data);
             }
             for (var i = 0; i < this._newCols.length; i++) {
                 if (this._newCols[i] >= index) {
