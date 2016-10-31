@@ -91,14 +91,47 @@ namespace ipushpull {
 
         public get current(): IPageContent { return this._current; }
 
-        public constructor(rawContent: IPageContent = [[]]){
-            this.update(rawContent);
+        public constructor(rawContent: IPageContent){
+            if (!rawContent || rawContent.constructor !== Array || !rawContent.length || !rawContent[0].length){
+                rawContent = [
+                    [
+                        {
+                            value: "",
+                            formatted_value: "",
+                        },
+                    ],
+                ];
+
+                this.canDoDelta = false;
+            }
+
+            this._original = Utils.clonePageContent(rawContent);
+
+            this._current = PageStyles.decompressStyles(rawContent);
         }
 
         public update(rawContent: IPageContent): void{
             this._original = Utils.clonePageContent(rawContent);
 
             let current: IPageContent = Utils.clonePageContent(this._current);
+
+            // Shrink matrix to incoming matrix. Because now matrixes are synced with new rows, we can safely remove whats overflowing
+            if (rawContent.length < current.length){
+                current.splice(rawContent.length - 1, (current.length - rawContent.length));
+
+                // And remove reference from new rows
+                this._newRows = this._newRows.filter((a) => {
+                    return (a < rawContent.length);
+                });
+            }
+
+            // Do same for columns
+            if (rawContent[0].length < current[0].length){
+                let diff: number = current[0].length - rawContent[0].length;
+                for (let i: number = 0; i < current.length; i++){
+                    current[i].splice(rawContent[0].length - 1, diff);
+                }
+            }
 
             // Extend the matrix of incoming content
             for (let i: number = 0; i < this._newRows.length; i++){
@@ -115,13 +148,6 @@ namespace ipushpull {
                     rawContent[j].splice(this._newCols[i], 0, current[j][i]);
                 }
             }
-
-            // Shrink matrix to incoming matrix if possible
-            if (rawContent.length < current.length){
-                // @todo Loop through current from rawContent.length and remove rows that are not marked as new and recalculate other new rows
-            }
-
-            // @todo Do same for columns
 
             // Now that we have same dimensions of matrix we can update only non-touched cells
             for (let i: number = 0; i < rawContent.length; i++){
@@ -410,6 +436,8 @@ namespace ipushpull {
 
             this._newCols = [];
             this._newRows = [];
+
+            this.canDoDelta = true;
         }
     }
 

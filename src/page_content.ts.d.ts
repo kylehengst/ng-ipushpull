@@ -74,7 +74,7 @@ declare namespace ipushpull {
         private _newRows;
         private _newCols;
         current: IPageContent;
-        constructor(rawContent?: IPageContent);
+        constructor(rawContent: IPageContent);
         update(rawContent: IPageContent): void;
         reset(): void;
         getCell(rowIndex: number, columnIndex: number): IPageContentCell;
