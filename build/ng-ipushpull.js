@@ -703,13 +703,24 @@ var ipushpull;
     "use strict";
     var PageContent = (function () {
         function PageContent(rawContent) {
-            if (rawContent === void 0) { rawContent = [[]]; }
             this.canDoDelta = true;
             this._original = [[]];
             this._current = [[]];
             this._newRows = [];
             this._newCols = [];
-            this.update(rawContent);
+            if (!rawContent || rawContent.constructor !== Array || !rawContent.length || !rawContent[0].length) {
+                rawContent = [
+                    [
+                        {
+                            value: "",
+                            formatted_value: "",
+                        },
+                    ],
+                ];
+                this.canDoDelta = false;
+            }
+            this._original = ipushpull.Utils.clonePageContent(rawContent);
+            this._current = PageStyles.decompressStyles(rawContent);
         }
         Object.defineProperty(PageContent.prototype, "current", {
             get: function () { return this._current; },
@@ -719,6 +730,18 @@ var ipushpull;
         PageContent.prototype.update = function (rawContent) {
             this._original = ipushpull.Utils.clonePageContent(rawContent);
             var current = ipushpull.Utils.clonePageContent(this._current);
+            if (rawContent.length < current.length) {
+                current.splice(rawContent.length - 1, (current.length - rawContent.length));
+                this._newRows = this._newRows.filter(function (a) {
+                    return (a < rawContent.length);
+                });
+            }
+            if (rawContent[0].length < current[0].length) {
+                var diff = current[0].length - rawContent[0].length;
+                for (var i = 0; i < current.length; i++) {
+                    current[i].splice(rawContent[0].length - 1, diff);
+                }
+            }
             for (var i = 0; i < this._newRows.length; i++) {
                 rawContent.splice(this._newRows[i], 0, current[i]);
             }
@@ -729,8 +752,6 @@ var ipushpull;
                     }
                     rawContent[j].splice(this._newCols[i], 0, current[j][i]);
                 }
-            }
-            if (rawContent.length < current.length) {
             }
             for (var i = 0; i < rawContent.length; i++) {
                 if (!current[i]) {
@@ -930,6 +951,7 @@ var ipushpull;
             }
             this._newCols = [];
             this._newRows = [];
+            this.canDoDelta = true;
         };
         return PageContent;
     }());
