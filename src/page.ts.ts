@@ -1493,6 +1493,7 @@ namespace ipushpull {
         private onPageError = (data: any): void => {
             $timeout(() => {
                 if (data.code === 401){
+                    // @todo This is wrong
                     auth.emit(auth.EVENT_401);
                 } else {
                     this.emit("error", data);
