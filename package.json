@@ -1,6 +1,6 @@
 {
   "name": "ng-ipushpull",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "IPushPull Angular module",
   "main": "build/ng-ipushpull.js",
   "dependencies": {},

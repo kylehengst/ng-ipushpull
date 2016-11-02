@@ -8483,13 +8483,12 @@ var ipushpull;
             this._pageName = (isNaN(+pageId)) ? pageId : undefined;
             if (!this._pageId) {
                 this.updatesOn = false;
-            }
-            if (!this._pageId) {
                 this.getPageId(this._folderName, this._pageName).then(function (res) {
                     _this._pageId = res.pageId;
                     _this._folderId = res.folderId;
                     _this.init();
                 }, function (err) {
+                    _this.onPageError(err);
                 });
             }
             else {
@@ -8642,6 +8641,7 @@ var ipushpull;
                 if (_this._provider instanceof ProviderREST) {
                     _this._provider.seqNo = _this._data.seq_no;
                 }
+                _this.emit(_this.EVENT_NEW_CONTENT, _this._data);
                 q.resolve(data);
             };
             if (!this._data.encryption_type_to_use && !this._data.encryption_type_used && this.Content.canDoDelta && !forceFull) {
@@ -8730,7 +8730,9 @@ var ipushpull;
             }
         };
         Page.prototype.destroy = function () {
-            this._provider.destroy();
+            if (this._provider) {
+                this._provider.destroy();
+            }
             $interval.cancel(this._accessInterval);
             this.removeEvent();
         };
