@@ -421,21 +421,19 @@ namespace ipushpull {
             this._folderName = (isNaN(+folderId)) ? <string>folderId : undefined;
             this._pageName = (isNaN(+pageId)) ? <string>pageId : undefined;
 
-            // If we dont have page id, cannot start autopulling
-            // @todo Should we emit some error to user?
-            if (!this._pageId){
-                this.updatesOn = false;
-            }
-
-            // If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
             if (!this._pageId) {
+                // If we dont have page id, cannot start autopulling
+                // @todo Should we emit some error to user?
+                this.updatesOn = false;
+
+                // If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
                 this.getPageId(this._folderName, this._pageName).then((res: any) => {
                     this._pageId = res.pageId;
                     this._folderId = res.folderId;
 
                     this.init();
                 }, (err) => {
-                        // @todo Handle error
+                    this.onPageError(err);
                 });
             } else {
                 this.init();
@@ -503,6 +501,8 @@ namespace ipushpull {
                 if (this._provider instanceof ProviderREST){
                     this._provider.seqNo = this._data.seq_no;
                 }
+
+                this.emit(this.EVENT_NEW_CONTENT, this._data);
 
                 q.resolve(data);
             };
@@ -639,7 +639,10 @@ namespace ipushpull {
          * Destroy page object
          */
         public destroy(): void {
-            this._provider.destroy();
+            if (this._provider) {
+                this._provider.destroy();
+            }
+
             $interval.cancel(this._accessInterval);
             this.removeEvent();
         }
