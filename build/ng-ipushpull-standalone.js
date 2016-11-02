@@ -7691,7 +7691,7 @@ var ipushpull;
                     _this.ippApi.unblock();
                 });
             };
-            this.on("401", this.on401);
+            this.on(this.EVENT_401, this.on401);
         }
         Object.defineProperty(Auth.prototype, "EVENT_LOGGED_IN", {
             get: function () { return "logged_in"; },
