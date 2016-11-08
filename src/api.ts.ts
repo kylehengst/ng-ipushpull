@@ -319,15 +319,15 @@ namespace ipushpull {
         }
 
         public getUserMetaData(data: any): IPromise<IRequestResult>{
-            return this.send(Request.get(this._endPoint + "/users/" + data.userId + "/self/").data(data.data));
+            return this.send(Request.get(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
         }
 
         public saveUserMetaData(data: any): IPromise<IRequestResult>{
-            return this.send(Request.del(this._endPoint + "/users/" + data.userId + "/self/").data(data.data));
+            return this.send(Request.put(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
         }
 
         public deleteUserMetaData(data: any): IPromise<IRequestResult>{
-            return this.send(Request.put(this._endPoint + "/users/" + data.userId + "/self/").data(data.data));
+            return this.send(Request.delete(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
         }
 
         public changePassword(data: any): IPromise<IRequestResult>{
