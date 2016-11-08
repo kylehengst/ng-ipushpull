@@ -64,7 +64,7 @@ namespace ipushpull {
         constructor(private $q: IQService, private $timeout: ITimeoutService, private ippApi: IApiService, private storage: IStorageService, private config: any){
             super();
 
-            this.on("401", this.on401);
+            this.on(this.EVENT_401, this.on401);
         }
 
         public authenticate(force: boolean = false): IPromise<any>{

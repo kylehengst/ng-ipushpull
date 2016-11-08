@@ -599,7 +599,7 @@ namespace ipushpull {
                     style[item] = (style[item] === "normal") ? "pre" : "pre-wrap";
                 }
 
-                if (styleName.indexOf("border") >= 0) {
+                if (styleName.indexOf("border") === 0) {
                     let pos: string = styleName.split("-")[1];
 
                     if (styleName.indexOf("-style") >= 0) {

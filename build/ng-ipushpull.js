@@ -448,7 +448,7 @@ var ipushpull;
                     _this.ippApi.unblock();
                 });
             };
-            this.on("401", this.on401);
+            this.on(this.EVENT_401, this.on401);
         }
         Object.defineProperty(Auth.prototype, "EVENT_LOGGED_IN", {
             get: function () { return "logged_in"; },
@@ -1044,7 +1044,7 @@ var ipushpull;
                 if (styleName === "white-space") {
                     style[item] = (style[item] === "normal") ? "pre" : "pre-wrap";
                 }
-                if (styleName.indexOf("border") >= 0) {
+                if (styleName.indexOf("border") === 0) {
                     var pos = styleName.split("-")[1];
                     if (styleName.indexOf("-style") >= 0) {
                         this.currentBorders[pos].style = this.excelBorderStyles[style[item]] || undefined;
