@@ -48,7 +48,7 @@ namespace ipushpull {
         public static del(url: string): Request{
             return new Request("DELETE", url);
         }
-        
+
         constructor (method: string, url: string){
             this._method = method;
             this._url = url;
@@ -104,7 +104,7 @@ namespace ipushpull {
 
             return this;
         }
-        
+
         public overrideLock(override: boolean = true): Request {
             this._overrideLock = override;
             return this;
@@ -132,6 +132,9 @@ namespace ipushpull {
         savePageSettings: (data: any) => IPromise<IRequestResult>;
         deletePage: (data: any) => IPromise<IRequestResult>;
         saveUserInfo: (data: any) => IPromise<IRequestResult>;
+        getUserMetaData: (data: any) => IPromise<IRequestResult>;
+        saveUserMetaData: (data: any) => IPromise<IRequestResult>;
+        deleteUserMetaData: (data: any) => IPromise<IRequestResult>;
         changePassword: (data: any) => IPromise<IRequestResult>;
         changeEmail: (data: any) => IPromise<IRequestResult>;
         forgotPassword: (data: any) => IPromise<IRequestResult>;
@@ -313,6 +316,18 @@ namespace ipushpull {
 
         public saveUserInfo(data: any): IPromise<IRequestResult>{
             return this.send(Request.put(this._endPoint + "/users/self/").data(data));
+        }
+
+        public getUserMetaData(data: any): IPromise<IRequestResult>{
+            return this.send(Request.get(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
+        }
+
+        public saveUserMetaData(data: any): IPromise<IRequestResult>{
+            return this.send(Request.put(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
+        }
+
+        public deleteUserMetaData(data: any): IPromise<IRequestResult>{
+            return this.send(Request.del(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
         }
 
         public changePassword(data: any): IPromise<IRequestResult>{

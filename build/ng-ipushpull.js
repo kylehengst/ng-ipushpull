@@ -276,6 +276,15 @@ var ipushpull;
         Api.prototype.saveUserInfo = function (data) {
             return this.send(Request.put(this._endPoint + "/users/self/").data(data));
         };
+        Api.prototype.getUserMetaData = function (data) {
+            return this.send(Request.get(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
+        };
+        Api.prototype.saveUserMetaData = function (data) {
+            return this.send(Request.put(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
+        };
+        Api.prototype.deleteUserMetaData = function (data) {
+            return this.send(Request.delete(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
+        };
         Api.prototype.changePassword = function (data) {
             return this.send(Request.put(this._endPoint + "/credentials/self/").data(data));
         };
