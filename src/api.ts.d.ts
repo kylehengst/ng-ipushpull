@@ -27,6 +27,9 @@ declare namespace ipushpull {
         savePageSettings: (data: any) => IPromise<IRequestResult>;
         deletePage: (data: any) => IPromise<IRequestResult>;
         saveUserInfo: (data: any) => IPromise<IRequestResult>;
+        getUserMetaData: (data: any) => IPromise<IRequestResult>;
+        saveUserMetaData: (data: any) => IPromise<IRequestResult>;
+        deleteUserMetaData: (data: any) => IPromise<IRequestResult>;
         changePassword: (data: any) => IPromise<IRequestResult>;
         changeEmail: (data: any) => IPromise<IRequestResult>;
         forgotPassword: (data: any) => IPromise<IRequestResult>;

@@ -283,7 +283,7 @@ var ipushpull;
             return this.send(Request.put(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
         };
         Api.prototype.deleteUserMetaData = function (data) {
-            return this.send(Request.delete(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
+            return this.send(Request.del(this._endPoint + "/users/" + data.userId + "/meta/").data(data.data));
         };
         Api.prototype.changePassword = function (data) {
             return this.send(Request.put(this._endPoint + "/credentials/self/").data(data));
