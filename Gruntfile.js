@@ -27,6 +27,7 @@ module.exports = function(grunt){
             ipushpull_standalone: {
                 dest: 'build/ng-ipushpull-standalone.js',
                 src: [
+                    'bower_components/eventEmitter/EventEmitter.min.js',
                     'bower_components/forge/js/forge.min.js',
                     'bower_components/socket.io-client/socket.io.js',
                     'src/ipushpull.ts.js',

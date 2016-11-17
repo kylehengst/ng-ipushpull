@@ -1,7 +1,7 @@
 {
   "name": "ng-ipushpull",
   "description": "IPushPull Angular module",
-  "version": "0.4.9",
+  "version": "0.5.0",
   "author": {
     "name": "iPushPull"
   },
@@ -32,8 +32,8 @@
   ],
   "dependencies": {
     "angular": ">= 1.2.0",
-    "socket.io-client": "^1.4.6",
-    "forge": "^0.6.42"
+    "socket.io-client": "^1.5",
+    "forge": "^0.6"
   },
   "devDependencies": {
     "eventEmitter": "^5.1.0"

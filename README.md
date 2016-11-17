@@ -15,44 +15,52 @@ bower install ng-ipushpull-page --save
 
 **Include script in your application**
 ```
-<script src="bower_components/ng-ipushpull-page/build/ng-ipushpull-page.js"></script>
+<script src="bower_components/ng-ipushpull-page/build/ng-ipushpull.min.js"></script>
 ```
 
 **Add as dependency to your application**
 ```
-angular.module("myApp", ["ipushpull.page"]);
+var app = angular.module("myApp", ["ipushpull"]);
 ```
 
 ## Usage
 ```
 // Configure ipushpull
-var myApp = angular.module("myApp", ["ipushpull.page"])
-    .config(["ippConfigProvier", function(ippConfigProvider){
+app.config(["ippConfigProvider", (ippConfigProvider) => {
         ippConfigProvider.set({
-            api_key: "ipushpull api key",
-            api_secret: "ipushpull_api_secret",
-            api_url: "https://www.ipushpull.com" // (optional defaults to production)        
+            api_url: "https://www.ipushpull.com", // optional
+            ws_url: "https://www.ipushpull.com", // optional
+            api_key: "iPushPull API Key",
+            api_secret: "iPushPull API Secret",
+            storage_prefix: "", // optional
+            transport: "polling", // optional - defaults to socket
         });
-    }]);
-    
+}]);    
+
 // Create page object in your controller/service
-myApp.controller("ExampleCtrl", ["ipushpullPage", function(IppPage){
+myApp.controller("ExampleCtrl", ["ippPageService", function(IppPage){
     // Create new page object
-    var page = new IppPage(1, 1);
+    var page = new IppPage(1, 1); // new IppPage(pageId, folderId) - also accepts names
     
     // Subscribe to events
-    page.on("new_content", function(data){
+    page.on(page.EVENT_NEW_CONTENT, function(data){
         console.log("New page content received", data);
     });
     
-    page.on("error", function(err){
+    page.on(page.EVENT_ERROR, function(err){
         console.error("Page error", err);
     });
     
     ...
     
+    // Access current content
+    console.log(page.current);
+    console.log(page.Content.getCell(0, 5));
+    
+    ...
+    
     // Use page API
-    page.push(content).catch(function(err){
+    page.push().catch(function(err){
         console.error("Push failed", err);
     });
     
