@@ -430,7 +430,7 @@ namespace ipushpull {
                 this.getPageId(this._folderName, this._pageName).then((res: any) => {
                     this._pageId = res.pageId;
                     this._folderId = res.folderId;
-
+                    this.updatesOn = true;
                     this.init();
                 }, (err) => {
                     this.onPageError(err);
