@@ -422,15 +422,10 @@ namespace ipushpull {
             this._pageName = (isNaN(+pageId)) ? <string>pageId : undefined;
 
             if (!this._pageId) {
-                // If we dont have page id, cannot start autopulling
-                // @todo Should we emit some error to user?
-                this.updatesOn = false;
-
                 // If we get folder name and page name, first get page id from REST and then continue with sockets - fiddly, but only way around it at the moment
                 this.getPageId(this._folderName, this._pageName).then((res: any) => {
                     this._pageId = res.pageId;
                     this._folderId = res.folderId;
-                    this.updatesOn = true;
                     this.init();
                 }, (err) => {
                     this.onPageError(err);
